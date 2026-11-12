@@ -1,0 +1,6 @@
+{
+  "id": "porter",
+  "displayName": "Porter",
+  "description": "A tiny ops companion for browser plugin work, SSH sessions, servers, NAS, and cloud infrastructure.",
+  "spritesheetPath": "spritesheet.webp"
+}

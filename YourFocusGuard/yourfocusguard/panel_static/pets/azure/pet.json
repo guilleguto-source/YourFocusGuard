@@ -1,0 +1,7 @@
+{
+  "id": "azure",
+  "displayName": "Azure",
+  "description": "A tiny blue dragon with small wings and a friendly snout.",
+  "spritesheetPath": "spritesheet.webp",
+  "category": "western"
+}

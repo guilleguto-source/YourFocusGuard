@@ -1,0 +1,6 @@
+{
+  "id": "eigenblob",
+  "displayName": "Eigenblob",
+  "description": "A soft abstract blob that changes orientation but remains unmistakably itself.",
+  "spritesheetPath": "spritesheet.webp"
+}

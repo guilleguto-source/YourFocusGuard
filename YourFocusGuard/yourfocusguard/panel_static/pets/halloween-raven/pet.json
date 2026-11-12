@@ -1,0 +1,9 @@
+{
+  "id": "halloween-raven",
+  "displayName": "Raven",
+  "description": "Raven, a little Halloween companion.",
+  "spritesheetPath": "spritesheet.webp",
+  "spriteVersionNumber": 2,
+  "category": "western",
+  "subcategory": "halloween"
+}

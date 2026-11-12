@@ -1,0 +1,7 @@
+{
+  "id": "null-wisp",
+  "displayName": "Null Wisp",
+  "description": "A small purple shadow wisp with a soft flame silhouette.",
+  "spritesheetPath": "spritesheet.webp",
+  "category": "western"
+}

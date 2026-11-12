@@ -1,0 +1,24 @@
+# Núcleo del pipeline
+mss>=9.0
+Pillow>=10.3
+python-dotenv>=1.0
+colorama>=0.4.6
+
+# Solo Windows (pip los ignora en otros sistemas)
+pywin32>=306 ; sys_platform == "win32"      # requerido por pyttsx3 (SAPI5)
+winotify>=1.1.0 ; sys_platform == "win32"   # toasts nativos
+keyboard>=0.13.5 ; sys_platform == "win32"  # atajo global Ctrl+Alt+F12
+
+# Voz de Mascota estilo Muse (v0.8.2)
+edge-tts>=7.0.0
+pygame>=2.5.0
+sounddevice>=0.4.6
+scipy>=1.13.0
+numpy>=1.26.0
+
+# Cerebro A: se usan según cerebro.proveedor_nube en config/*.toml
+google-genai>=1.0.0
+openai>=1.40.0
+
+# Webcam de verificación bajo demanda (v0.2.1, opt-in en [camara])
+opencv-python-headless>=4.9

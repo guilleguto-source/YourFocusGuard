@@ -1,0 +1,7 @@
+{
+  "id": "bitty",
+  "displayName": "Bitty",
+  "description": "A tiny retro handheld console with a smiling green screen.",
+  "spritesheetPath": "spritesheet.webp",
+  "category": "western"
+}

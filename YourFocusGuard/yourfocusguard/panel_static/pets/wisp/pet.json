@@ -1,0 +1,7 @@
+{
+  "id": "wisp",
+  "displayName": "Wisp",
+  "description": "A tiny blue flame spirit with a dark face.",
+  "spritesheetPath": "spritesheet.webp",
+  "category": "western"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "moonman",
+  "displayName": "Moonman",
+  "description": "A tiny toy astronaut companion with a glossy dark visor and off-white suit, based on the provided reference photo.",
+  "spritesheetPath": "spritesheet.webp"
+}

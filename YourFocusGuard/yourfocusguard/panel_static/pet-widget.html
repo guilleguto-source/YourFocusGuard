@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="es" data-reaction-state="idle" data-pet-name="einstein">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mascota Embebida</title>
+  <style>
+    :root {
+      --pet-scale: 0.8;
+      --play-state: running;
+      --bubble-bg: #FFFFFF;
+      --bubble-border: #D8D2C4;
+      --bubble-text: #2F2B25;
+    }
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .pet-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 4px;
+      height: 100%;
+      box-sizing: border-box;
+    }
+    /* Burbuja de diálogo compacta y protegida contra desbordamiento */
+    .bubble {
+      position: relative;
+      width: 92%;
+      max-width: 170px;
+      max-height: 64px;
+      margin-bottom: 6px;
+      padding: 5px 8px;
+      background: var(--bubble-bg);
+      border: 1.5px solid var(--bubble-border);
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(47, 43, 37, 0.08);
+      color: var(--bubble-text);
+      font-size: 9.5px;
+      line-height: 1.25;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(4px) scale(0.95);
+      transition: all 180ms cubic-bezier(0.2, 0, 0, 1);
+      pointer-events: auto;
+      z-index: 10;
+      overflow-y: auto;
+      overflow-x: hidden;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      scrollbar-width: thin;
+      box-sizing: border-box;
+    }
+    .bubble.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%) rotate(45deg);
+      width: 8px;
+      height: 8px;
+      background: var(--bubble-bg);
+      border-right: 1.5px solid var(--bubble-border);
+      border-bottom: 1.5px solid var(--bubble-border);
+    }
+    .bubble-opciones {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+    .bubble-btn {
+      background: #EFECE6;
+      border: 1px solid #D8D2C4;
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 600;
+      color: #2F2B25;
+      cursor: pointer;
+      transition: background 120ms;
+    }
+    .bubble-btn:hover {
+      background: #7A8B6F;
+      color: #FFFFFF;
+      border-color: #7A8B6F;
+    }
+    /* Controles de acción rápida inferior */
+    .quick-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      align-items: center;
+      margin-top: 4px;
+      width: 100%;
+    }
+    .quick-btn {
+      background: #FDFBF7;
+      border: 1px solid #D8D2C4;
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 8.5px;
+      font-weight: 600;
+      color: #4A3F33;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 120ms ease;
+      white-space: nowrap;
+    }
+    .quick-btn:hover {
+      background: #E8E5DD;
+      border-color: #8C8275;
+      color: #1A1815;
+    }
+    .quick-btn.active-pause {
+      background: #D97706;
+      color: #FFFFFF;
+      border-color: #B45309;
+    }
+    .quick-btn.active-focus {
+      background: #7A8B6F;
+      color: #FFFFFF;
+      border-color: #5C6E52;
+    }
+    /* Hitbox y contenedor del sprite */
+    .pet-shell {
+      position: relative;
+      width: 96px;
+      height: 104px;
+      cursor: grab;
+      -webkit-app-region: drag;
+    }
+    .pet-shell:active {
+      cursor: grabbing;
+    }
+    .bubble, .pet-selector, .bubble-btn {
+      -webkit-app-region: no-drag;
+    }
+    .installed-card {
+
+      position: absolute;
+      width: 96px;
+      height: 104px;
+      overflow: hidden;
+    }
+    .installed-sprite {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 192px;
+      height: 208px;
+      background-image: url("/pets/einstein/spritesheet.webp");
+      background-size: 1536px 1872px;
+      background-repeat: no-repeat;
+      transform: scale(0.5);
+      transform-origin: top left;
+      background-position: var(--sprite-offset-x) var(--sprite-row-y);
+      animation: var(--sprite-animation, pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations));
+      animation-play-state: var(--play-state);
+    }
+    /* Animación de frames horizontal */
+    @keyframes pet-frames {
+      from { background-position: var(--sprite-offset-x) var(--sprite-row-y); }
+      to   { background-position: var(--sprite-end-offset-x) var(--sprite-row-y); }
+    }
+    /* Reglas de estados extraídas del estándar OpenPets */
+    html[data-reaction-state="idle"] .installed-sprite {
+      --sprite-row-y: -0px; --sprite-offset-x: 0px; --sprite-end-offset-x: -1152px;
+      --sprite-frames: 6; --sprite-duration: 5500ms; --sprite-iterations: infinite;
+      --sprite-animation: pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations);
+    }
+    html[data-reaction-state="working"] .installed-sprite,
+    html[data-reaction-state="review"] .installed-sprite {
+      --sprite-row-y: -1664px; --sprite-offset-x: 0px; --sprite-end-offset-x: -1152px;
+      --sprite-frames: 6; --sprite-duration: 1030ms; --sprite-iterations: infinite;
+      --sprite-animation: pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations);
+    }
+    html[data-reaction-state="thinking"] .installed-sprite,
+    html[data-reaction-state="waiting"] .installed-sprite {
+      --sprite-row-y: -1248px; --sprite-offset-x: 0px; --sprite-end-offset-x: -1152px;
+      --sprite-frames: 6; --sprite-duration: 1010ms; --sprite-iterations: infinite;
+      --sprite-animation: pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations);
+    }
+    html[data-reaction-state="error"] .installed-sprite,
+    html[data-reaction-state="failed"] .installed-sprite {
+      --sprite-row-y: -1040px; --sprite-offset-x: 0px; --sprite-end-offset-x: -1536px;
+      --sprite-frames: 8; --sprite-duration: 1220ms; --sprite-iterations: 2;
+      --sprite-animation: pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations);
+    }
+    html[data-reaction-state="celebrating"] .installed-sprite,
+    html[data-reaction-state="jumping"] .installed-sprite {
+      --sprite-row-y: -832px; --sprite-offset-x: 0px; --sprite-end-offset-x: -960px;
+      --sprite-frames: 5; --sprite-duration: 840ms; --sprite-iterations: 2;
+      --sprite-animation: pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations);
+    }
+    html[data-reaction-state="waving"] .installed-sprite {
+      --sprite-row-y: -624px; --sprite-offset-x: 0px; --sprite-end-offset-x: -768px;
+      --sprite-frames: 4; --sprite-duration: 700ms; --sprite-iterations: 2;
+      --sprite-animation: pet-frames var(--sprite-duration) steps(var(--sprite-frames)) var(--sprite-iterations);
+    }
+    /* Selector flotante de mascota */
+    .pet-selector {
+      margin-top: 4px;
+      font-size: 10px;
+      padding: 2px 4px;
+      border: 1px solid #D8D2C4;
+      border-radius: 4px;
+      background: #FDFBF7;
+      color: #4A3F33;
+      cursor: pointer;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="pet-container">
+    <div id="bubble" class="bubble">
+      <div id="bubble-text">¡Hola! Listo para el foco.</div>
+      <div id="bubble-opciones" class="bubble-opciones"></div>
+    </div>
+    <div class="pet-shell" id="pet-shell" title="Clic para interactuar">
+      <div class="installed-card">
+        <div id="pet-sprite" class="installed-sprite"></div>
+      </div>
+    </div>
+    <select id="pet-selector" class="pet-selector" title="Cambiar mascota">
+      <option value="einstein" selected>Einstein</option>
+    </select>
+    <div class="quick-actions" id="quick-actions">
+      <button type="button" class="quick-btn" id="btn-quick-pause" title="Pausa de 10 minutos (requiere confirmación para reanudar)">⏸ Pausar 10m</button>
+      <button type="button" class="quick-btn" id="btn-quick-continue" title="Continuar 15 minutos más de foco">▶ Continuar +15m</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      let petActual = "einstein";
+      let bubbleTimeout = null;
+
+      const htmlEl = document.documentElement;
+      const spriteEl = document.getElementById("pet-sprite");
+      const bubbleEl = document.getElementById("bubble");
+      const bubbleText = document.getElementById("bubble-text");
+      const bubbleOpciones = document.getElementById("bubble-opciones");
+      const petSelector = document.getElementById("pet-selector");
+
+      function fijarMascota(nombre) {
+        if (!nombre) return;
+        petActual = nombre;
+        spriteEl.style.backgroundImage = `url('/pets/${nombre}/spritesheet.webp')`;
+        htmlEl.setAttribute("data-pet-name", nombre);
+        if (petSelector.value !== nombre) {
+          petSelector.value = nombre;
+        }
+      }
+
+      function fijarEstado(estado) {
+        const estadoNorm = (estado || "idle").toLowerCase();
+        htmlEl.setAttribute("data-reaction-state", estadoNorm);
+      }
+
+      function mostrarBurbuja(texto, opciones = [], duracionMs = 5000) {
+        if (!texto) {
+          bubbleEl.classList.remove("visible");
+          return;
+        }
+        bubbleText.textContent = texto;
+        bubbleOpciones.innerHTML = "";
+
+        if (Array.isArray(opciones) && opciones.length > 0) {
+          opciones.forEach(op => {
+            const btn = document.createElement("button");
+            btn.className = "bubble-btn";
+            btn.textContent = op;
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              fetch("/api/pet/responder", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ respuesta: op })
+              }).catch(() => {});
+              bubbleEl.classList.remove("visible");
+            };
+            bubbleOpciones.appendChild(btn);
+          });
+        }
+
+        bubbleEl.classList.add("visible");
+        if (bubbleTimeout) clearTimeout(bubbleTimeout);
+        if (duracionMs > 0 && (!opciones || opciones.length === 0)) {
+          bubbleTimeout = setTimeout(() => {
+            bubbleEl.classList.remove("visible");
+          }, duracionMs);
+        }
+      }
+
+      petSelector.addEventListener("change", function(e) {
+        const nueva = e.target.value;
+        fijarMascota(nueva);
+        fetch("/api/pet/set-pet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mascota: nueva })
+        }).catch(() => {});
+      });
+
+      // Polling cada 800ms al backend de YourFocusGuard
+      async function poll() {
+        try {
+          const res = await fetch("/api/pet/state");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.mascota && data.mascota !== petActual) {
+              fijarMascota(data.mascota);
+            }
+            if (data.reaccion) {
+              fijarEstado(data.reaccion);
+            }
+            if (data.burbuja && data.burbuja.texto) {
+              mostrarBurbuja(
+                data.burbuja.texto,
+                data.burbuja.opciones || [],
+                data.burbuja.duracion || 4000
+              );
+            }
+          }
+        } catch (e) {
+          // Servidor local no responde, reintento silencioso
+        } finally {
+          setTimeout(poll, 800);
+        }
+      }
+
+      // Cargar lista dinámica de mascotas desde el backend
+      async function cargarListaMascotas() {
+        try {
+          const res = await fetch("/api/pet/list");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.pets && Array.isArray(data.pets)) {
+              petSelector.innerHTML = "";
+              data.pets.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = p.nombre;
+                if (p.id === petActual) opt.selected = true;
+                petSelector.appendChild(opt);
+              });
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Iniciar
+      const btnPause = document.getElementById("btn-quick-pause");
+      const btnContinue = document.getElementById("btn-quick-continue");
+
+      if (btnPause) {
+        btnPause.addEventListener("click", () => {
+          fetch("/api/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cmd: "pause_manual", minutos: 10, espera_confirmacion: true })
+          }).then(() => {
+            mostrarBurbuja("Pausa de 10 min iniciada. Confirma con Continuar para reanudar.", ["Continuar"], 0);
+          }).catch(() => {});
+        });
+      }
+
+      if (btnContinue) {
+        btnContinue.addEventListener("click", () => {
+          fetch("/api/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cmd: "resume_or_extend", minutos: 15 })
+          }).then(() => {
+            mostrarBurbuja("¡Excelente! +15 min de enfoque activados.", [], 4000);
+          }).catch(() => {});
+        });
+      }
+
+      cargarListaMascotas();
+      poll();
+
+    })();
+  </script>
+</body>
+</html>

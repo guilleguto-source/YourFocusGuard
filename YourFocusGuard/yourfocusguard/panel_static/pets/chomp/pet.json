@@ -1,0 +1,7 @@
+{
+  "id": "chomp",
+  "displayName": "Chomp",
+  "description": "A cheerful blue shark with a red scarf and gem medallion.",
+  "spritesheetPath": "spritesheet.webp",
+  "category": "western"
+}

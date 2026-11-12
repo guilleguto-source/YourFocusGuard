@@ -1,0 +1,2 @@
+# Desarrollo y pruebas
+pytest>=8.0

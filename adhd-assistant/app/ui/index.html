@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YourFocusGuard • Asistente TDAH Inteligente</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="top-nav">
+      <div class="brand">
+        <div class="status-orb pulse"></div>
+        <h1>FocusGuard <span>ADHD Assistant</span></h1>
+      </div>
+      <div class="sync-badges">
+        <span class="badge badge-google" id="badgeGoogle">● Google Calendar & Tasks</span>
+        <span class="badge badge-vikunja" id="badgeVikunja">● Vikunja Local</span>
+      </div>
+    </header>
+
+    <!-- Main Voice & Interaction Hub -->
+    <section class="voice-hero">
+      <div class="mic-container">
+        <div class="ripple-ring ring-1"></div>
+        <div class="ripple-ring ring-2"></div>
+        <div class="ripple-ring ring-3"></div>
+        
+        <button id="btnMic" class="mic-button ripple-btn" title="Mantén presionado para hablar">
+          <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="voice-status-box">
+        <div class="status-indicator" id="statusIndicator">En reposo • Presiona el micrófono o escribe abajo</div>
+        <canvas id="waveformCanvas" width="400" height="40"></canvas>
+      </div>
+
+      <!-- Quick Text Input -->
+      <form id="textForm" class="text-input-bar">
+        <input type="text" id="userInput" placeholder="Ej: 'anota que debo entregar el informe mañana', 'alarma en 45 min', 'pon lofi'..." autocomplete="off">
+        <button type="submit" class="send-btn ripple-btn">
+          <span>Enviar</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg>
+        </button>
+      </form>
+    </section>
+
+    <!-- Content Grid -->
+    <div class="content-grid">
+      <!-- Columna 1: Tareas y Cronograma Dual -->
+      <section class="card tasks-card">
+        <div class="card-header">
+          <div class="title-wrap">
+            <h2>📋 Mis Pendientes y Prioridades</h2>
+            <span class="subtitle">Sincronizado en tiempo real (Google & Vikunja)</span>
+          </div>
+          <button id="btnRefreshTasks" class="icon-btn ripple-btn" title="Actualizar">↻</button>
+        </div>
+
+        <div class="add-task-bar">
+          <input type="text" id="newTaskInput" placeholder="Añadir nueva tarea...">
+          <select id="newTaskPriority">
+            <option value="2">⚡ Normal</option>
+            <option value="3">🔥 Alta</option>
+            <option value="4">🚨 Urgente</option>
+            <option value="1">☕ Baja</option>
+          </select>
+          <button id="btnAddTask" class="action-btn ripple-btn">+ Añadir</button>
+        </div>
+
+        <ul class="task-list" id="taskList">
+          <li class="loading-item">Cargando tareas sincronizadas...</li>
+        </ul>
+      </section>
+
+      <!-- Columna 2: Audio & Enfoque TDAH + Alarmas -->
+      <div class="side-column">
+        <!-- Audio Player Card -->
+        <section class="card audio-card">
+          <div class="card-header">
+            <div class="title-wrap">
+              <h2>🎧 Audio & Enfoque TDAH</h2>
+              <span class="subtitle">YouTube libre + Ruido blanco y marrón local</span>
+            </div>
+          </div>
+
+          <!-- Noise Quick Presets -->
+          <div class="noise-presets">
+            <button class="preset-btn ripple-btn" data-noise="brown">
+              <span class="preset-icon">🟤</span>
+              <span class="preset-name">Ruido Marrón</span>
+              <span class="preset-desc">Foco profundo TDAH</span>
+            </button>
+            <button class="preset-btn ripple-btn" data-noise="white">
+              <span class="preset-icon">⚪</span>
+              <span class="preset-name">Ruido Blanco</span>
+              <span class="preset-desc">Aislamiento acústico</span>
+            </button>
+            <button class="preset-btn ripple-btn" data-noise="pink">
+              <span class="preset-icon">🌸</span>
+              <span class="preset-name">Ruido Rosa</span>
+              <span class="preset-desc">Lectura y calma</span>
+            </button>
+          </div>
+
+          <!-- YouTube Stream Search -->
+          <form id="youtubeForm" class="youtube-search-bar">
+            <input type="text" id="ytQuery" placeholder="Buscar música en YouTube (ej: Hans Zimmer, Synthwave)...">
+            <button type="submit" class="action-btn ripple-btn">▶ Reproducir</button>
+          </form>
+
+          <!-- Active Player Box -->
+          <div class="player-box" id="playerBox">
+            <div class="player-info">
+              <div class="player-title" id="playerTitle">Sin reproducción activa</div>
+              <div class="player-badge" id="playerBadge">Detenido</div>
+            </div>
+            <div class="player-controls">
+              <button id="btnStopAudio" class="control-btn ripple-btn">⏹ Detener</button>
+              <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.7" title="Volumen">
+            </div>
+          </div>
+          <audio id="audioStream" preload="none"></audio>
+        </section>
+
+        <!-- Alarmas Activas -->
+        <section class="card timers-card">
+          <div class="card-header">
+            <h2>⏰ Alarmas y Recordatorios</h2>
+          </div>
+          <div id="timersList" class="timers-list">
+            <div class="empty-state">No hay alarmas activas en este momento.</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

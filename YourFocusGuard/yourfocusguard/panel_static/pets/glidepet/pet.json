@@ -1,0 +1,6 @@
+{
+  "id": "glidepet",
+  "displayName": "GlidePet",
+  "description": "A tiny ECAM-inspired avionics monitor companion for Codex workflows.",
+  "spritesheetPath": "spritesheet.webp"
+}

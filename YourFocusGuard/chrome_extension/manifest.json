@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "YourFocusGuard — YouTube Audio Defocus",
+  "version": "1.0.0",
+  "description": "Desenfoca suavemente los videos de YouTube durante sesiones de trabajo mientras mantiene el audio intacto.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "http://127.0.0.1:8756/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

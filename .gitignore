@@ -1,0 +1,45 @@
+# Secretos y Credenciales (NUNCA SUBIR)
+.env
+*.env
+token.json
+credentials.json
+client_secret_*.json
+user.toml
+*user.toml
+
+# Entorno Virtual y Caché Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.pytest_tmp/
+_pytmp/
+
+# Datos y Bases de Datos
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+adhd-assistant/data/*.json
+redis-data/
+
+# Archivos de medios temporales y paquetes
+*.mp3
+*.wav
+*.png
+*.zip
+temp_audit_pack/
+
+# Carpetas ajenas al agente
+rea-analysis/
+
+# IDE y Sistema Operativo
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

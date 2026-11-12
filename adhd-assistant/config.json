@@ -1,0 +1,21 @@
+{
+  "apis": {
+    "groq": {
+      "modelo": "llama3-8b-8192",
+      "usar_para": ["respuesta_rapida", "charla", "clasificacion_intencion"]
+    },
+    "gemini": {
+      "modelo": "gemini-1.5-flash",
+      "usar_para": ["calendario", "musica", "planificacion", "contexto_largo"]
+    }
+  },
+  "acciones": {
+    "crear_evento": "calendar.create_event",
+    "reproducir_musica": "music.play_track"
+  },
+  "asistente_tdaah": {
+    "idioma": "es",
+    "modo": "escuchar_primero",
+    "respuestas_cortas": true
+  }
+}

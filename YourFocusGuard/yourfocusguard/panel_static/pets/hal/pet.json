@@ -1,0 +1,6 @@
+{
+  "id": "hal",
+  "displayName": "HAL",
+  "description": "A compact pixel-art HAL 9000 eye companion for Codex.",
+  "spritesheetPath": "spritesheet.webp"
+}

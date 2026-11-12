@@ -1,0 +1,240 @@
+# ===========================================================================
+# YourFocusGuard — configuración base (blueprint, tabla 5)
+#
+# Capas: default.toml -> <perfil>.toml (pc/laptop) -> user.toml (tus ajustes,
+# gitignored). La última capa gana. Claves en español porque esto lo editas tú.
+# ===========================================================================
+
+[agente]
+maquina = "pc_diseno"        # pc_diseno | laptop: identidad en la tabla sesion
+prompt_id = "v1"             # versión del prompt (Apéndice B: versionado)
+
+[captura]
+# v0.4.0: la captura de pantalla sale del mapa (false = Modo Anclado: el
+# agente se guía por primer plano + inactividad, sin imágenes y sin nube).
+# true = modo monitoreo clásico con análisis visual.
+habilitada = false
+intervalo_seg = 15           # solo aplica al modo monitoreo (cap. 3 del blueprint)
+fifo_frames = 5              # ventana efectiva 45-75 s
+monitor = 1                  # 1 = principal
+escala_max_ancho = 1280      # reescalado antes de enviar a la nube (coste)
+calidad_jpeg = 80
+
+[cerebro]
+proveedor_nube = "gemini"    # gemini | openai | ninguno
+analisis_nube_seg = 60       # ciclo del Nivel A (cap. 4); laptop: 120-180
+imagenes_por_analisis = 2    # frames del lote FIFO que viajan a la API
+timeout_seg = 20
+temperatura = 0.0            # prompt v1: siempre cero
+modelo_gemini = "gemini-2.0-flash"
+modelo_openai = "gpt-4o-mini"
+confianza_minima = 0.6       # umbral para que un veredicto mueva el estado
+presupuesto_diario_usd = 0.75    # corte automático de nube (tabla 11)
+coste_por_analisis_usd = 0.003   # estimación del contador de presupuesto
+cache_min_seg = 10           # reusar veredicto si app y título no cambiaron
+disyuntor_fallos = 3         # fallos consecutivos antes de apagar la nube
+disyuntor_descanso_min = 10  # minutos de silencio del disyuntor
+
+[heuristica]                 # Nivel B: listas en minúsculas, editables
+# Apps que cuentan como trabajo (nombre de proceso, sin .exe)
+apps_enfoque = [
+  "pycharm", "code", "photoshop", "illustrator", "indesign", "blender",
+  "unity", "unreal", "godot", "winword", "excel", "powerpnt", "onenote",
+  "outlook", "sublime_text", "idea64", "rstudio", "matlab", "reaper",
+  "ableton", "studio one",
+]
+# Regex sobre el título de ventana que cuentan como trabajo
+titulos_enfoque = []         # p. ej. ["tesis", "cap[íi]tulo 3", "blueprint"]
+
+# Apps de distracción clara
+apps_distraccion = [
+  "steam", "epicgameslauncher", "battle.net", "riotclientservices",
+  "discord", "telegram", "tiktok", "minecraft", "genshinimpact",
+  "hd-player", "ldplayer", "bluestacks",
+]
+# Regex sobre el título: redes y streaming (aunque estén en el navegador)
+titulos_distraccion = [
+  "youtube", "netflix", "twitch", "tiktok", "instagram", "facebook",
+  "twitter", "\\bx\\.com\\b", "reddit", "pinterest", "9gag", "disney",
+  "hbo", "crunchyroll", "prime video", "pluto",
+]
+# Apps que ni son trabajo ni distracción (explorador, buscador, terminal...)
+apps_neutras = [
+  "explorer", "notepad", "calc", "mspaint", "snippingtool", "searchhost",
+  "systemsettings", "startmenuexperiencehost", "shell experience host",
+  "taskmgr", "cmd", "powershell", "windowsterminal",
+]
+idle_ausencia_seg = 120      # regla 5: idle > 2 min suspende los ciclos
+
+[alertas]                    # escalera de la tabla 5
+desvio_sostenido_seg = 30    # 30 s - 5 min en el Panel; tabla 5 recomienda 20-60
+mascota_seg = 20             # N0: expresión de la mascota
+aviso_seg = 30               # N1: consola + sonido suave
+toast_seg = 60               # N2: notificación de Windows
+voz_seg = 90                 # N3: voz TTS; después arranca el cooldown
+enfriamiento_seg = 300       # 5 min de silencio tras la voz
+tope_por_hora = 4            # protección anti-acoso
+tts_habilitado = true
+tts_voz = ""                 # vacío = automática; nombres exactos con `doctor`
+tts_velocidad = 170
+toast_habilitado = true
+silenciar_pantalla_completa = true  # regla 2; false = ni el vídeo a pantalla completa se libra
+# v0.3.0: canales de aviso (editable en el Panel > Avisos y medidas)
+modo = "completo"            # visual | visual_sonoro | completo
+traer_al_frente_app = ""     # modo completo: app que vuelve al frente ("lightroom")
+traer_al_frente_tras = 2     # tras el 2.º (o 3.º) llamado del episodio
+minutos_antes_de_traer = 2.0 # v0.5.0: además, el desvío debe llevar este tiempo
+nivel_1_apagado = false      # v0.7.1: apagar nivel mascota (N0)
+nivel_2_apagado = false      # v0.7.1: apagar aviso sutil (N1)
+nivel_3_apagado = false      # v0.7.1: apagar toast (N2)
+nivel_5_apagado = false      # v0.7.1: apagar voz/cooldown (N3)
+refuerzo_positivo = true       # v0.8.2: felicitar micro-hitos de foco continuo
+refuerzo_intervalo_min = 10    # cada 10 min de foco ininterrumpido
+
+[pomodoro]                   # cap. 5: orquestador Pomodoro
+habilitado = true
+foco_min = 25
+pausa_min = 5
+pausa_larga_min = 15
+ciclos_para_larga = 4
+
+[sesion]                     # modo sesión (v0.2.0): guardián de tarea por predicados
+# Se activa por CLI:  python run.py session start "editar fotos" --apps photoshop,lightroom
+# Las apps también pueden fijarse aquí (se pisan con las del comando):
+# apps = ["photoshop", "lightroom", "lightzone"]
+apps_auxiliares = []         # toleradas: no cuentan como ausencia (explorer, bridge, zoom)
+segundos_fuera_app = 60      # R1: ninguna app objetivo al frente ni visible en ningún monitor
+segundos_inactivo = 60       # R2: app presente pero sin tocar ratón ni teclado
+intervalo_sondeo = 5         # con sesión activa el ciclo pasa a sondear cada N s (sin imágenes)
+capturar_al_disparar = false # v0.4.0: sin captura de evidencia (solo webcam si la habilitas)
+verificar_con_camara_seg = 20 # R0 (v0.2.1): N s congelado -> UNA foto de webcam; 0 = off
+ausencia_seg = 300           # v0.5.0: pantalla bloqueada / suspensión / idle largo -> pausa sola
+exigir_primer_plano = false  # v0.5.0: true = la app debe estar AL FRENTE (no vale otro monitor)
+monitor_objetivo = 0         # v0.5.0: además, la ventana al frente debe estar en este monitor (0 = cualquiera)
+
+[camara]                     # v0.2.1: webcam de verificación bajo demanda (opt-in)
+habilitada = false           # false = el agente nunca toca la webcam (privacidad por defecto)
+indice = 0                   # 0 = webcam por defecto; si tienes varias prueba 1, 2...
+ancho_max = 640              # minimización: la foto se reescala antes de guardarse
+calidad_jpeg = 80
+preframes = 6                # frames de estabilización antes de capturar (exposición)
+foto_en_disparo = true       # foto de webcam además de la captura, cuando dispara R1/R2
+guardar_fotos = true         # false = la foto vive solo en RAM y se descarta
+retencion_dias = 7           # poda de data/fotos (carpetas por día)
+
+[privacidad]                 # cap. 7: estas ventanas NI se capturan NI se evalúan
+apps_excluidas = [
+  "keepass", "bitwarden", "1password", "lastpass", "enpass", "kypass",
+]
+titulos_excluidos = [
+  "inprivate", "incognito", "incógnito", "privad[oa]", "banca",
+  "home banking", "banco", "paypal", "mercado ?pago", "afip",
+  "mi argentina", "stripe",
+]
+atajo_pausa = "ctrl+alt+f12" # pausa rápida global (Windows)
+pausa_rapida_min = 15
+# v0.5.0: respuesta a la pregunta del asistente sin abrir la consola
+atajo_sigo = "ctrl+alt+f11"        # "sigo en la tarea": cierra el aviso actual
+atajo_pausa_corta = "ctrl+alt+f10" # pausa corta a pedido
+pausa_corta_min = 10
+
+[prohibiciones]               # v0.3.0: presupuestos diarios (editable en el Panel)
+lista = []
+# Ejemplos (el panel los añade con un clic):
+# lista = [
+#   { patron = "youtube",   limite_min_dia = 60, bloqueo_activo = true,
+#     excepciones = ["youtube music", "mix", "lofi"] },   # música sí, vídeos no
+#   { patron = "instagram", limite_min_dia = 30, bloqueo_activo = false },
+# ]
+# El conteo es por primer plano (proceso o título), sin capturas; sobrevive
+# reinicios y caduca al día siguiente. bloqueo_activo = minimizar la app
+# cada vez que vuelve al frente una vez agotado el presupuesto.
+
+[mascota]                    # v0.3.0: la guardiana de escritorio (agente visual)
+visible = true                # false = sin ventana (solo consola/toasts)
+tema = "clasico"              # clasico | oscuro | calido (o añade el tuyo en mascota.py)
+posicion = "inferior_derecha" # inferior_derecha | inferior_izquierda
+ancho = 150                   # px del lienzo
+
+[avatar]                     # v0.6.0: qué cara pone el asistente
+# auto      = OpenPets si está abierto; si no, avatar embed en panel, o mascota tkinter
+# embed     = avatar embebido en el panel web local (sin OpenPets)
+# openpets  = solo OpenPets (sin fallback)
+# tk        = solo la mascota integrada
+# ninguno   = sin cara (consola, toasts y voz)
+proveedor = "auto"
+mascota = "null-wisp"         # null-wisp | bitty | glitchcat | luffy-gear-5 | meowbot | pixel-terminal | shadow-kit | wukong
+frases = true                 # mostrar burbujas de texto en el avatar
+
+[flujos]                      # v0.8.0: grupos de trabajo y apps relacionadas
+habilitado = true
+aprendizaje = true            # preguntar amablemente si una app desconocida es del flujo
+umbral_descubrimiento_min = 2 # minutos antes de preguntar
+
+[[flujos.grupo]]
+nombre = "edicion_foto"
+apps = ["lightroom", "lightroomclassic", "photoshop"]
+apps_relacionadas = ["gutoflow", "bridge", "explorer", "capcut"]
+tolerancia_min = 2.0
+mensaje_aviso = "¿Volvemos a Lightroom?"
+
+[[flujos.grupo]]
+nombre = "desarrollo"
+apps = ["antigravity", "claude", "claude-code", "deepseek", "harness"]
+apps_relacionadas = ["vscode", "terminal", "git", "github"]
+tolerancia_min = 5.0
+mensaje_aviso = "¿Volvemos al código?"
+
+
+[panel]                       # v0.3.0: Panel del Guardián (solo 127.0.0.1, nunca la red)
+activo = true                 # arranca con `start`; false = solo consola
+puerto = 8756
+abrir_navegador = true        # false = no abrir la pestaña al arrancar
+
+[datos]
+carpeta = "./data"           # relativa al proyecto; ruta absoluta si prefieres
+retencion_dias = 180         # 6 meses con poda automática (tabla 7)
+
+[registro]
+nivel = "INFO"               # DEBUG para ver cada decisión del router
+
+[concentracion]              # v0.7.0: modo máxima concentración
+habilitado = false
+bloquear_hosts = true
+silenciar_audio = true
+dominios = []
+apps_bloqueadas = []
+restaurar_al_salir = true
+duracion_min = 0             # 0 = hasta próximo reinicio; 30/60/120/300 presets
+
+[voz]                        # v0.8.3 O-03: tiempos de escucha configurables
+segundos_escucha = 8.0       # segundos de escucha al pulsar el botón 🎤 (5.0 a 15.0)
+segundos_n3 = 7.0            # segundos de escucha tras aviso por voz N3
+
+[notas]                      # Captura rápida / Brain Dump (Logseq o Markdown local)
+habilitado = true
+carpeta_diario = ""          # ej. "C:/Users/Guill/Documents/Logseq/journals"; vacío = usa archivo_inbox_respaldo
+archivo_inbox_respaldo = "./data/inbox_tdah.md"
+formato_todo = true          # true = genera "- TODO hh:mm nota", false = "- hh:mm nota"
+
+[rutinas]                    # Hábitos y recordatorios automáticos (v0.8.3 Fase 3)
+habilitado = true
+pausa_activa_cada_min = 50   # cada cuántos minutos recordar estirar y tomar agua (0 = apagado)
+pausa_activa_mensaje = "Llevas 50 minutos concentrado. Estira la espalda y toma un vaso de agua."
+ejercicio_hora = ""          # hora diaria fija ej. "18:30" (vacío = apagado)
+ejercicio_mensaje = "Momento de cerrar pantallas y hacer ejercicio."
+
+[vikunja]                    # Integración con Vikunja (v0.8.3 Fase 4)
+habilitado = false           # opt-in: requiere servidor Vikunja activo
+url = ""                     # ej. "http://localhost:3456"
+token = ""                   # token de API Bearer
+proyecto_defecto_id = 1      # ID de proyecto/lista por defecto
+
+[musica]                     # Música y ruido de fondo para concentración (v0.8.3 Fase 4)
+habilitado = true
+volumen = 0.5                # 0.0 a 1.0
+url_stream = ""              # URL de stream lo-fi / radio; vacío = generador ruido marrón en numpy
+
+
+
+

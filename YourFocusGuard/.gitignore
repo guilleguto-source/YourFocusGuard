@@ -1,0 +1,24 @@
+# Entorno
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secretos
+.env
+
+# Datos del agente (base, logs, estado, control, tts_cache)
+data/
+!data/.gitkeep
+datos/
+*.mp3
+
+# Temporales de la suite (conftest los crea dentro del repo)
+_pytmp/
+.pytest_tmp/
+pytest-cache-files-*/
+
+# Empaquetado
+build/
+dist/
+*.spec

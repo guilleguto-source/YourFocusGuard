@@ -1,0 +1,6 @@
+{
+  "id": "ninjacat",
+  "displayName": "Ninjacat",
+  "description": "A tiny red-bandana ninja cat companion for focused Codex sessions.",
+  "spritesheetPath": "spritesheet.webp"
+}

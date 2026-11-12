@@ -1,0 +1,20 @@
+{
+  "id": "cerbie",
+  "displayName": "Cerbie",
+  "description": "A tiny three-headed Cerberus guardian for focused coding sessions.",
+  "spritesheetPath": "spritesheet.webp",
+  "speechBubbles": {
+    "enabled": true,
+    "triggers": [
+      "active",
+      "summon",
+      "command"
+    ],
+    "oneLiners": [
+      "None shall pass.",
+      "Three heads, one bork.",
+      "Guarding the gates.",
+      "Bork bork bork!"
+    ]
+  }
+}

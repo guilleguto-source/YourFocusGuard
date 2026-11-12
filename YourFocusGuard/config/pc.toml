@@ -1,0 +1,13 @@
+# Perfil del PC de diseño: modo completo (tabla 8 del blueprint).
+# Solo lo que cambia respecto de default.toml.
+
+[agente]
+maquina = "pc_diseno"
+
+[captura]
+intervalo_seg = 15
+fifo_frames = 5
+
+[cerebro]
+proveedor_nube = "gemini"    # o "openai"; la clave va en .env
+analisis_nube_seg = 60

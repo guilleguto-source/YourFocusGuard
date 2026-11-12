@@ -1,0 +1,19 @@
+# Perfil de la laptop antigua: modo ligero (tabla 8 del blueprint).
+# Nivel B puro: cero coste de API, CPU mínima, sin nube.
+
+[agente]
+maquina = "laptop"
+
+[captura]
+intervalo_seg = 20
+fifo_frames = 5
+
+[cerebro]
+proveedor_nube = "ninguno"   # si algún día quieres nube aquí: "gemini" + .env
+analisis_nube_seg = 180
+
+[alertas]
+tts_velocidad = 160
+
+[sesion]                     # laptop: sondeo un poco más holgado
+intervalo_sondeo = 8

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="es" data-tema="claro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YourFocusGuard · Panel del Guardián</title>
+  <link rel="stylesheet" href="/estilos.css">
+</head>
+<body>
+  <header class="cabecera">
+    <div class="marca">
+      <svg class="logo" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+        <path d="M12 3l8 3v6c0 4.4-3.2 7.6-8 9-4.8-1.4-8-4.6-8-9V6l8-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="12" cy="11" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 13.6V17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <div class="marca-texto">
+        <strong>YourFocusGuard</strong>
+        <small>Panel del Guardián</small>
+      </div>
+    </div>
+    <div class="cabecera-derecha">
+      <span id="chip-estado" class="chip chip-neutro">cargando…</span>
+      <button id="boton-tema" class="boton-fantasma" type="button" title="Cambiar entre claro y oscuro">
+        <span id="boton-tema-texto">Oscuro</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ======================= Navegación por pestañas (Tabs TDAH) ======================= -->
+  <nav class="nav-tabs" role="tablist" aria-label="Navegación del panel">
+    <button type="button" class="tab-boton activo" role="tab" id="tab-btn-enfoque" aria-selected="true" aria-controls="panel-enfoque" data-tab="panel-enfoque">
+      <span class="tab-icono">🎯</span>
+      <span class="tab-texto">Centro de Enfoque</span>
+    </button>
+    <button type="button" class="tab-boton" role="tab" id="tab-btn-escudo" aria-selected="false" aria-controls="panel-escudo" data-tab="panel-escudo">
+      <span class="tab-icono">🛡️</span>
+      <span class="tab-texto">Escudo y Bloqueos</span>
+    </button>
+    <button type="button" class="tab-boton" role="tab" id="tab-btn-ajustes" aria-selected="false" aria-controls="panel-ajustes" data-tab="panel-ajustes">
+      <span class="tab-icono">⚙️</span>
+      <span class="tab-texto">Ajustes y Calibración</span>
+    </button>
+  </nav>
+
+  <main>
+    <!-- ============================================================== -->
+    <!-- TAB 1: CENTRO DE ENFOQUE                                       -->
+    <!-- ============================================================== -->
+    <div id="panel-enfoque" class="tab-panel activo" role="tabpanel" aria-labelledby="tab-btn-enfoque">
+      <!-- Estado en vivo -->
+      <section class="hero">
+        <h1>Bienvenida, guardián</h1>
+        <p class="sub">
+          Todo lo que ajustes aquí vive en tu equipo: se guarda en
+          <code>config/user.toml</code> y el agente lo aplica en vivo.
+          Nada sale a la red; este panel solo escucha en 127.0.0.1.
+        </p>
+        <div class="stats">
+          <article class="stat">
+            <span class="stat-etiqueta">Estado</span>
+            <strong id="st-estado">—</strong>
+            <small id="st-estado-detalle">sin señal todavía</small>
+          </article>
+          <article class="stat">
+            <span class="stat-etiqueta">Sesión</span>
+            <strong id="st-sesion">—</strong>
+            <small id="st-sesion-detalle">sin sesión declarada</small>
+          </article>
+          <article class="stat">
+            <span class="stat-etiqueta">Nube hoy</span>
+            <strong id="st-nube">—</strong>
+            <small id="st-nube-detalle">presupuesto diario 0.75 USD</small>
+          </article>
+        </div>
+        <div class="acciones" id="acciones">
+          <button type="button" class="boton" data-cmd="pause">Pausar 15 min</button>
+          <button type="button" class="boton" data-cmd="resume">Reanudar</button>
+          <button type="button" class="boton" data-cmd="test_alert">Probar avisos</button>
+          <button type="button" class="boton peligro" data-cmd="stop">Detener agente</button>
+        </div>
+      </section>
+
+      <!-- Sesión de hoy -->
+      <section id="sesion-seccion" class="seccion">
+        <h2>Sesión de hoy</h2>
+        <p class="seccion-sub">
+          Declara qué vas a hacer y con qué programas. Mientras cumplas no hay
+          capturas ni nube; si sales de ellos o te quedas congelado, el guardián
+          te llama; si te fuiste, se pausa solo.
+        </p>
+        <div class="tarjetas">
+          <article class="tarjeta">
+            <h3>Declarar la sesión</h3>
+            <div class="campo">
+              <label for="sesion-tarea">Tarea</label>
+              <input type="text" id="sesion-tarea" maxlength="200"
+                     placeholder="editar fotos de la boda">
+            </div>
+            <div class="campo">
+              <label for="sesion-apps">Programas de trabajo</label>
+              <input type="text" id="sesion-apps" maxlength="400"
+                     placeholder="lightroom, photoshop">
+              <small>separados por coma · sin <code>.exe</code> · acepta regex simple: <code>light.?room</code></small>
+            </div>
+            <div class="campo">
+              <label for="sesion-aux">Toleradas</label>
+              <input type="text" id="sesion-aux" maxlength="400"
+                     placeholder="explorer, bridge">
+              <small>no cuentan como salida (mover archivos, consultar referencias)</small>
+            </div>
+            <div class="acciones">
+              <button type="button" class="boton primario" id="sesion-iniciar">Iniciar sesión</button>
+              <button type="button" class="boton" id="sesion-detectar">Detectar apps (10 s)</button>
+              <button type="button" class="boton secundario" id="sesion-cerrar">Cerrar sesión</button>
+            </div>
+            <p class="ayuda" id="sesion-estado">sin sesión declarada</p>
+            <p class="ayuda">
+              Al guardar, los programas quedan como predeterminados en
+              <code>config/user.toml</code>; el agente los recarga en vivo.
+            </p>
+          </article>
+
+          <!-- Mascota guardiana interactiva en vivo -->
+          <article class="tarjeta" id="mascota-seccion">
+            <div class="fila-interruptor">
+              <div>
+                <h3>Compañera virtual</h3>
+                <p class="ayuda sin-margen">Mascota reactiva con voz neuronal y expresiones.</p>
+              </div>
+              <label class="interruptor">
+                <input type="checkbox" id="mascota-visible" checked>
+                <span class="interruptor-pieza"></span>
+              </label>
+            </div>
+            <div class="campo mascota-tema-fila">
+              <label for="mascota-tema">Apariencia (tema)</label>
+              <select id="mascota-tema" aria-label="Tema de la mascota"></select>
+            </div>
+            <p class="ayuda" id="avatar-estado">Cara activa: —</p>
+
+            <div class="campo" style="margin-top: 10px; text-align: center;">
+              <iframe src="/pet-widget.html" style="width: 100%; height: 215px; border: 1.5px solid var(--linea); border-radius: 12px; background: rgba(0,0,0,0.02);" title="Mascota interactiva"></iframe>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Reporte Semanal F5 -->
+      <section id="reporte-semanal" class="seccion">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2>Reporte Semanal y Calibración TDAH</h2>
+          <button type="button" class="boton" id="btn-refrescar-reporte">Actualizar</button>
+        </div>
+        <p class="seccion-sub">
+          Métricas de enfoque acumuladas de los últimos 7 días desde tu base local de eventos.
+        </p>
+        <div class="stats">
+          <article class="stat">
+            <span class="stat-etiqueta">Foco total (7d)</span>
+            <strong id="rep-foco-total">—</strong>
+            <small id="rep-foco-detalle">minutos de hiperfoco</small>
+          </article>
+          <article class="stat">
+            <span class="stat-etiqueta">Desvíos detectados</span>
+            <strong id="rep-desvios-total">—</strong>
+            <small id="rep-desvios-detalle">salidas de la tarea</small>
+          </article>
+          <article class="stat">
+            <span class="stat-etiqueta">Pomodoros completados</span>
+            <strong id="rep-pomodoros-total">—</strong>
+            <small id="rep-pomodoros-detalle">ciclos cerrados</small>
+          </article>
+          <article class="stat">
+            <span class="stat-etiqueta">Voz y Diálogo (7d)</span>
+            <strong id="rep-voz-total">—</strong>
+            <small id="rep-voz-detalle">coste acumulado: $0.00</small>
+          </article>
+        </div>
+        <div class="tarjetas" style="margin-top:1rem;">
+          <article class="tarjeta">
+            <h3>Top aplicaciones distractoras</h3>
+            <ul id="rep-top-apps" style="margin: 0.5rem 0 0 1.2rem; font-size: 0.95rem; color: var(--texto);">
+              <li>Sin datos suficientes aún</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: ESCUDO Y BLOQUEOS                                       -->
+    <!-- ============================================================== -->
+    <div id="panel-escudo" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-escudo" hidden>
+      <!-- Concentración -->
+      <section id="concentracion" class="seccion">
+        <h2>Modo Máxima Concentración</h2>
+        <p class="seccion-sub">
+          Cuando se activa, el asistente no solo avisa: actúa. Bloquea dominios
+          distractores en el archivo hosts de Windows, silencia el audio y
+          minimiza apps bloqueadas cada vez que vuelven al frente. Todo se
+          deshace al cerrar la sesión.
+        </p>
+        <div class="tarjetas">
+          <article class="tarjeta">
+            <div class="fila-interruptor">
+              <div>
+                <h3>Activar máxima concentración</h3>
+                <p class="ayuda sin-margen">Requiere privilegios de administrador para editar el archivo hosts.</p>
+              </div>
+              <label class="interruptor">
+                <input type="checkbox" id="concentracion-activa">
+                <span class="interruptor-pieza"></span>
+              </label>
+            </div>
+            <div id="concentracion-detalles" class="colapsable">
+              <div class="campo">
+                <label for="concentracion-dominios">Dominios a bloquear</label>
+                <input type="text" id="concentracion-dominios" maxlength="300"
+                       placeholder="youtube.com, instagram.com, tiktok.com, netflix.com">
+                <p class="ayuda">Separados por coma. Si lo dejas vacío, se usa una lista predeterminada.</p>
+              </div>
+              <div class="campo">
+                <label for="concentracion-apps">Apps a minimizar al frente</label>
+                <input type="text" id="concentracion-apps" maxlength="300"
+                       placeholder="chrome, firefox, steam, discord">
+                <p class="ayuda">Nombres de proceso sin .exe. Se minimizan cada vez que vuelven al primer plano.</p>
+              </div>
+              <label class="fila-interruptor">
+                <span class="interruptor">
+                  <input type="checkbox" id="concentracion-hosts" checked>
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Bloquear dominios vía archivo hosts</span>
+              </label>
+              <label class="fila-interruptor">
+                <span class="interruptor">
+                  <input type="checkbox" id="concentracion-audio" checked>
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Silenciar audio del sistema</span>
+              </label>
+              <div class="campo">
+                <label for="concentracion-duracion">Duración del modo concentración</label>
+                <select id="concentracion-duracion">
+                  <option value="0">Hasta próximo reinicio (no se apaga solo)</option>
+                  <option value="30">30 minutos</option>
+                  <option value="60">1 hora</option>
+                  <option value="120">2 horas</option>
+                  <option value="300">5 horas</option>
+                </select>
+                <p class="ayuda">Al cumplirse el tiempo, el modo se desactiva solo y se restauran hosts y audio.</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Prohibiciones (banda oscura) -->
+      <section id="prohibiciones" class="seccion seccion-oscura">
+        <h2>Prohibiciones y presupuestos</h2>
+        <p class="seccion-sub">
+          "No permitir YouTube más de 1 hora, o redes sociales." Se cuenta el
+          tiempo de primer plano por proceso o título de ventana, sin capturas;
+          sobrevive reinicios y se borra al día siguiente.
+        </p>
+
+        <div class="chips-rapidos" id="chips-rapidos">
+          <span class="chips-titulo">Añadir rápido:</span>
+          <button type="button" class="chip-boton" data-patron="youtube" data-limite="60" data-excepciones="youtube music, mix, lofi">YouTube · 60 min (sin música)</button>
+          <button type="button" class="chip-boton" data-patron="instagram" data-limite="30">Instagram · 30 min</button>
+          <button type="button" class="chip-boton" data-patron="tiktok" data-limite="30">TikTok · 30 min</button>
+          <button type="button" class="chip-boton" data-patron="netflix" data-limite="45">Netflix · 45 min</button>
+        </div>
+
+        <div id="lista-prohibiciones" class="lista-prohibiciones" aria-live="polite"></div>
+        <p id="prohibiciones-vacio" class="vacio">
+          Sin prohibiciones todavía. Añade una con los chips de arriba o el botón
+          de abajo; el conteo corre solo mientras el agente está corriendo.
+        </p>
+        <button type="button" id="agregar-prohibicion" class="boton boton-secundario">+ Añadir prohibición</button>
+
+        <p class="ayuda">
+          <strong>Bloqueo activo</strong>: al agotarse el presupuesto del día, la
+          app se minimiza cada vez que vuelve al frente hasta mañana. Sin bloqueo,
+          el guardián solo avisa con un toast cuando se agota.
+        </p>
+      </section>
+
+      <!-- Presencia -->
+      <section id="presencia" class="seccion">
+        <h2>Detección de Presencia</h2>
+        <p class="seccion-sub">
+          MediaPipe bajo demanda: detecta si hay una persona frente a la cámara
+          (estás en la silla) y si sostiene un teléfono. Opt-in: la cámara solo
+          se abre para un frame puntual cada N segundos, nunca de forma continua.
+        </p>
+        <div class="tarjetas">
+          <article class="tarjeta">
+            <div class="fila-interruptor">
+              <div>
+                <h3>Activar detección de presencia</h3>
+                <p class="ayuda sin-margen">Requiere opencv-python-headless y mediapipe instalados.</p>
+              </div>
+              <label class="interruptor">
+                <input type="checkbox" id="presencia-activa">
+                <span class="interruptor-pieza"></span>
+              </label>
+            </div>
+            <div id="presencia-detalles" class="colapsable">
+              <div class="slider-fila">
+                <label class="slider-etiqueta">Cada cuántos segundos comprobar</label>
+                <input type="number" id="presencia-intervalo" min="5" max="300" step="5" value="30">
+              </div>
+              <div class="campo">
+                <label for="presencia-indice">Índice de cámara</label>
+                <input type="number" id="presencia-indice" min="0" max="16" step="1" value="0">
+                <p class="ayuda">0 = webcam por defecto; prueba 1, 2… si tienes varias.</p>
+              </div>
+              <div class="slider-fila">
+                <label class="slider-etiqueta">Pausar sesión si no hay rostro durante (seg)</label>
+                <input type="number" id="presencia-ausente" min="0" max="3600" step="30" value="120">
+                <p class="ayuda">0 = desactivar la pausa automática por ausencia física.</p>
+              </div>
+              <label class="fila-interruptor">
+                <span class="interruptor">
+                  <input type="checkbox" id="presencia-telefono">
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Avisar si detecta teléfono en la mano</span>
+              </label>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 3: AJUSTES Y CALIBRACIÓN                                   -->
+    <!-- ============================================================== -->
+    <div id="panel-ajustes" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-ajustes" hidden>
+      <!-- Avisos -->
+      <section id="avisos" class="seccion">
+        <h2>Avisos y medidas</h2>
+        <p class="seccion-sub">Cómo te llama la atención el asistente cuando te despistas.</p>
+        <div class="tarjetas">
+          <article class="tarjeta">
+            <h3>Modo de aviso</h3>
+            <div class="segmento" role="radiogroup" aria-label="Modo de aviso">
+              <label class="segmento-opcion">
+                <input type="radio" name="modo" value="visual">
+                <span>Solo visual<small>mascota y notificaciones, sin sonido</small></span>
+              </label>
+              <label class="segmento-opcion">
+                <input type="radio" name="modo" value="visual_sonoro" checked>
+                <span>Visual + sonido<small>añade aviso sonoro y voz</small></span>
+              </label>
+              <label class="segmento-opcion">
+                <input type="radio" name="modo" value="completo">
+                <span>Completo<small>…y devuelve tu app al frente</small></span>
+              </label>
+            </div>
+
+            <div id="zona-completo" class="subtarjeta" hidden>
+              <div class="campo">
+                <label for="tras">Tras el</label>
+                <select id="tras">
+                  <option value="2">2.º</option>
+                  <option value="3">3.º</option>
+                </select>
+                <label for="app-objetivo">llamado, traer al frente:</label>
+              </div>
+              <input type="text" id="app-objetivo" maxlength="64"
+                     placeholder="lightroom — vacío = la 1.ª app de la sesión activa">
+              <div class="campo" style="margin-top:10px;">
+                <label for="minutos-antes-de-traer">Minutos antes de traer al frente</label>
+                <input type="number" id="minutos-antes-de-traer" min="0" max="30" step="0.5" value="2">
+                <p class="ayuda">Además del número de llamados, el desvío debe llevar este tiempo antes de que la app vuelva al frente.</p>
+              </div>
+              <p class="ayuda">
+                Se busca por nombre de proceso o título de ventana (regex simple,
+                minúsculas). Ej.: <code>lightroom</code>, <code>light.?room</code>,
+                <code>photoshop</code>.
+              </p>
+            </div>
+
+            <!-- Niveles de aviso apagables -->
+            <div class="subtarjeta">
+              <h4>Niveles de aviso (apagar individualmente)</h4>
+              <label class="fila-interruptor" style="justify-content:flex-start; gap:12px;">
+                <span class="interruptor">
+                  <input type="checkbox" id="nivel-1-apagado">
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Nivel 1 — mascota (expresión)</span>
+              </label>
+              <label class="fila-interruptor" style="justify-content:flex-start; gap:12px; margin-top:8px;">
+                <span class="interruptor">
+                  <input type="checkbox" id="nivel-2-apagado">
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Nivel 2 — aviso sutil (sonido)</span>
+              </label>
+              <label class="fila-interruptor" style="justify-content:flex-start; gap:12px; margin-top:8px;">
+                <span class="interruptor">
+                  <input type="checkbox" id="nivel-3-apagado">
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Nivel 3 — toast de Windows</span>
+              </label>
+              <label class="fila-interruptor" style="justify-content:flex-start; gap:12px; margin-top:8px;">
+                <span class="interruptor">
+                  <input type="checkbox" id="nivel-5-apagado">
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Nivel 5 — voz / cooldown</span>
+              </label>
+              <p class="ayuda">
+                Desmarca los niveles que no quieras que el asistente ejecute. El
+                nivel 0 (mascota) siempre está activo como expresión visual.
+              </p>
+            </div>
+
+            <!-- Refuerzo positivo de enfoque continuo -->
+            <div class="subtarjeta" style="margin-top: 14px;">
+              <h4>Refuerzo positivo (TDAH)</h4>
+              <label class="fila-interruptor" style="justify-content:flex-start; gap:12px;">
+                <span class="interruptor">
+                  <input type="checkbox" id="refuerzo-positivo" checked>
+                  <span class="interruptor-pieza"></span>
+                </span>
+                <span class="interruptor-texto">Felicitar racha de enfoque continuo</span>
+              </label>
+              <div class="campo" style="margin-top: 10px;">
+                <label for="refuerzo-intervalo">Intervalo de felicitación (minutos)</label>
+                <input type="number" id="refuerzo-intervalo" min="1" max="60" step="1" value="10">
+                <p class="ayuda">La mascota celebra con alegría y una frase de ánimo cada vez que mantienes este tiempo de foco sin desvíos.</p>
+              </div>
+            </div>
+            <p class="ayuda">
+              La escalera sigue siendo gradual (mascota → aviso → toast → voz)
+              con enfriamiento de 5 min y tope de 4 escaladas por hora: el modo
+              solo elige los canales.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Flujos de Trabajo -->
+      <section id="flujos-seccion" class="seccion">
+        <h2>Flujos de trabajo y apps relacionadas</h2>
+        <p class="seccion-sub">Apps auxiliares (ej. Gutoflow en edición de fotos, terminal en desarrollo) toleradas sin desvíos prematuros.</p>
+        <div class="tarjetas">
+          <article class="tarjeta">
+            <div class="fila-interruptor">
+              <div>
+                <h3>Reconocimiento de flujos</h3>
+                <p class="ayuda sin-margen">Tolera apps relacionadas durante el tiempo configurado antes de alertar.</p>
+              </div>
+              <label class="interruptor">
+                <input type="checkbox" id="flujos-activo" checked>
+                <span class="interruptor-pieza"></span>
+              </label>
+            </div>
+            <div id="flujos-detalles" class="colapsable">
+              <div class="fila-interruptor" style="margin-top: 14px;">
+                <div>
+                  <h3>Modo aprendizaje activo</h3>
+                  <p class="ayuda sin-margen">Preguntar amablemente si una app desconocida es parte del flujo tras unos minutos.</p>
+                </div>
+                <label class="interruptor">
+                  <input type="checkbox" id="flujos-aprendizaje" checked>
+                  <span class="interruptor-pieza"></span>
+                </label>
+              </div>
+              <div class="campo" style="margin-top: 14px;">
+                <label for="flujos-umbral">Minutos antes de preguntar por apps desconocidas</label>
+                <input type="number" id="flujos-umbral" min="1" max="30" step="1" value="2">
+              </div>
+              <div class="campo" style="margin-top: 16px;">
+                <label style="font-weight: 600; margin-bottom: 6px; display: block;">Grupos de flujo activos</label>
+                <div id="lista-flujos" style="display: flex; flex-direction: column; gap: 12px;"></div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Monitoreo -->
+      <section id="monitoreo" class="seccion">
+        <h2>Monitoreo</h2>
+        <p class="seccion-sub">La frecuencia con la que el guardián mira, y cuánta paciencia tiene antes de intervenir.</p>
+        <div class="tarjetas">
+          <article class="tarjeta">
+            <h3>Modo de vigilancia</h3>
+            <label class="fila-interruptor">
+              <span class="interruptor">
+                <input type="checkbox" id="captura-activa">
+                <span class="interruptor-pieza"></span>
+              </span>
+              <span class="interruptor-texto">Captura de pantalla (modo monitoreo clásico)</span>
+            </label>
+            <p class="ayuda">
+              <strong>Desmarcado (recomendado)</strong>: Modo Anclado — el agente se
+              guía solo por qué app está al frente y tu inactividad: sin capturas,
+              sin cámara obligatoria, sin nube. Marca la casilla solo si quieres el
+              análisis visual clásico; la cámara sigue siendo opcional aparte.
+            </p>
+          </article>
+          <article class="tarjeta">
+            <h3>Frecuencia de captura</h3>
+            <div class="slider-fila">
+              <input type="range" id="frecuencia" min="5" max="60" step="1" value="15"
+                     aria-label="Segundos entre capturas">
+              <output id="frecuencia-valor" for="frecuencia">15 s</output>
+            </div>
+            <p class="derivado" id="frecuencia-derivado">—</p>
+            <p class="ayuda">
+              Solo aplica al modo monitoreo: con una sesión activa el sondeo es de
+              5&nbsp;s y sin imágenes. Las capturas viven en RAM ~75&nbsp;s y jamás
+              tocan el disco.
+            </p>
+          </article>
+
+          <article class="tarjeta">
+            <h3>Tiempos de intervención</h3>
+            <div class="slider-fila">
+              <label class="slider-etiqueta">Desvío sostenido <small>modo monitoreo</small></label>
+              <input type="range" id="inactividad" min="30" max="300" step="5" value="30"
+                     aria-label="Segundos de desvío sostenido">
+              <output id="inactividad-valor" for="inactividad">30 s</output>
+            </div>
+            <div class="slider-fila">
+              <label class="slider-etiqueta">Fuera de las apps <small>sesión</small></label>
+              <input type="range" id="r1" min="10" max="300" step="5" value="60"
+                     aria-label="Segundos fuera de las apps de la sesión">
+              <output id="r1-valor" for="r1">1 min</output>
+            </div>
+            <div class="slider-fila">
+              <label class="slider-etiqueta">Sin tocar nada <small>sesión</small></label>
+              <input type="range" id="r2" min="10" max="300" step="5" value="60"
+                     aria-label="Segundos sin input con la app presente">
+              <output id="r2-valor" for="r2">1 min</output>
+            </div>
+            <p class="ayuda">
+              Mueve el desvío entre 30&nbsp;s y 5&nbsp;min a tu gusto. El blueprint
+              recomienda 20-60&nbsp;s: por encima de eso el guardián es relajado.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Pantalla -->
+      <section id="pantalla" class="seccion">
+        <h2>Pantalla y captura</h2>
+        <p class="seccion-sub">Con dos monitores, elige de cuál se toma la imagen para el análisis visual.</p>
+        <div class="tarjetas">
+          <article class="tarjeta">
+            <h3>Pantalla principal para captura</h3>
+            <div id="pantalla-select-zona">
+              <select id="pantalla" aria-label="Monitor a capturar"></select>
+            </div>
+            <div id="pantalla-manual" class="slider-fila" hidden>
+              <label class="slider-etiqueta">Nº de monitor <small>1 = principal</small></label>
+              <input type="number" id="pantalla-num" min="1" max="16" step="1" value="1">
+            </div>
+            <p class="ayuda">
+              La detección de ventana activa e inactividad es <strong>global</strong>:
+              Windows solo tiene una ventana al frente entre todos los monitores,
+              y una app visible en el otro monitor cuenta como presente. Esta
+              opción solo decide qué pantalla se captura para el análisis visual.
+            </p>
+          </article>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <span id="pie-version">YourFocusGuard</span>
+    <span class="pie-sep">·</span> panel local 127.0.0.1
+    <span class="pie-sep">·</span> tus datos nunca salen de este equipo
+    <span class="pie-sep">·</span> consola: <code>python run.py status</code>
+  </footer>
+
+  <!-- Barra de guardado -->
+  <div id="barra-guardado" class="barra-guardado" hidden>
+    <span class="barra-texto">Cambios sin guardar</span>
+    <span class="barra-botones">
+      <button type="button" id="descartar" class="boton-fantasma-claro">Descartar</button>
+      <button type="button" id="guardar" class="boton primario">Guardar y aplicar</button>
+    </span>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/aplicacion.js"></script>
+</body>
+</html>

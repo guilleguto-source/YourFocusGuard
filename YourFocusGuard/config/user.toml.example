@@ -1,0 +1,55 @@
+# Ejemplo de user.toml: cópialo como config/user.toml y edita lo tuyo.
+# Esta capa pisa a default.toml y al perfil, y NO se sube a git.
+
+#[heuristica]
+#titulos_enfoque = ["tesis", "cap[íi]tulo 3"]
+#apps_distraccion = [
+#  "steam", "epicgameslauncher", "discord", "telegram", "tiktok",
+#]
+#titulos_distraccion = [
+#  "youtube", "netflix", "tiktok", "instagram", "\\bx\\.com\\b", "reddit",
+#]
+
+#[alertas]
+#desvio_sostenido_seg = 25     # más sensible (rango recomendado 20-60)
+#tts_voz = "Microsoft Sabina Desktop"
+
+#[pomodoro]
+#habilitado = false
+
+#[sesion]                     # valores por defecto del guardián de tarea
+#apps = ["photoshop", "lightroom", "lightzone"]   # rutina fija, editable por CLI
+#apps_auxiliares = ["explorer", "bridge", "zoom"]
+#segundos_fuera_app = 60      # tu idea original: 20 s si quieres más agresivo
+#segundos_inactivo = 60       # renders largos: súbelo (120-180)
+#capturar_al_disparar = true  # false = ni la evidencia; solo consola/toast/voz
+#verificar_con_camara_seg = 20  # tu idea: 20 s congelado -> foto de verificación
+
+#[camara]                     # webcam de verificación bajo demanda (v0.2.1)
+#habilitada = true            # opt-in: prueba antes con `python run.py test-cam`
+#indice = 0                   # otra webcam: 1, 2...
+#guardar_fotos = true         # false = solo RAM: se toma, se registra y se descarta
+#retencion_dias = 7           # días de vida de data/fotos
+
+#[prohibiciones]              # v0.3.0: "no permitir YouTube 1 hora" (el Panel los gestiona)
+#lista = [
+#  { patron = "youtube",   limite_min_dia = 60, bloqueo_activo = true },
+#  { patron = "instagram", limite_min_dia = 30, bloqueo_activo = false },
+#]
+
+#[alertas]                    # modos de aviso del Panel (v0.3.0)
+#modo = "completo"            # visual | visual_sonoro | completo
+#traer_al_frente_app = "lightroom"
+#traer_al_frente_tras = 2     # tras el 2.º llamado
+
+#[mascota]                    # la guardiana de escritorio (v0.3.0)
+#tema = "calido"              # clasico | oscuro | calido
+#posicion = "inferior_izquierda"
+
+#[panel]                      # Panel del Guardián (v0.3.0)
+#activo = true
+#puerto = 8756
+#abrir_navegador = false
+
+#[privacidad]
+#titulos_excluidos = ["inprivate", "banca", "afip"]
