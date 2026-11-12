@@ -32,7 +32,7 @@ _PATRONES_AGENDA = [
     re.compile(r"\b(?:agenda|agendar|programa|programar)\s+(?:una|un|la|el|tarea|cita|reuni[oó]n|evento)\b", re.IGNORECASE),
     re.compile(r"\b(?:crear|agrega|agregar|nueva|nuevo)\s+(?:la\s+|el\s+|una\s+|un\s+)?(?:tarea|reuni[oó]n|cita)\b", re.IGNORECASE),
     re.compile(r"\b(?:tarea\s+para|recordar\s+tarea)\b", re.IGNORECASE),
-    re.compile(r"\b(?:crear\s+en|agrega\s+a)\s+vikunja\b", re.IGNORECASE),
+    re.compile(r"\b(?:crear\s+en|agrega\s+a|guardar\s+en|anota\s+en)\s+vikunja\b", re.IGNORECASE),
 ]
 
 _PREFIJOS_LIMPIAR = [

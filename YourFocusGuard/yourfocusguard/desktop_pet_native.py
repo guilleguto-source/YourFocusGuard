@@ -49,6 +49,20 @@ def _crear_rect_redondeado(canvas: tk.Canvas, x1: int, y1: int, x2: int, y2: int
     return canvas.create_polygon(puntos, smooth=True, **kwargs)
 
 
+def _parse_opcion(op):
+    """Normaliza una opción (tupla, lista, string 'clave,etiqueta' o texto) a (clave, etiqueta)."""
+    if isinstance(op, (list, tuple)):
+        clave = str(op[0]).strip()
+        etiqueta = str(op[1]).strip() if len(op) > 1 else clave
+    elif isinstance(op, str) and "," in op:
+        partes = op.split(",", 1)
+        clave = partes[0].strip()
+        etiqueta = partes[1].strip()
+    else:
+        clave = etiqueta = str(op or "").strip()
+    return clave, etiqueta
+
+
 class MascotaFlotanteNativa:
     def __init__(self, mascota_id: str = "null-wisp", puerto: int = 8756, tamaño: str = "normal") -> None:
         self.puerto = puerto
@@ -370,33 +384,62 @@ class MascotaFlotanteNativa:
                 self.root.config(cursor="")
             ))
 
-        if self._opciones_activas and len(self._opciones_activas) >= 2:
-            # Modo Confirmación con 2 botones píldora (ej: Agendar / Cancelar)
-            btn_w = (self.ancho_win - 20) // 2
-            bx0 = 6
-            bx1 = bx0 + btn_w
-            cx0 = bx1 + 8
-            cx1 = self.ancho_win - 6
-
+        if self._opciones_activas:
+            opciones_parsed = [_parse_opcion(op) for op in self._opciones_activas]
+            n_ops = len(opciones_parsed)
             self._countdown_seg = auto_confirmar_seg if auto_confirmar_seg > 0 else 0
-            txt_opc0 = f"{self._opciones_activas[0]} ({self._countdown_seg}s)" if self._countdown_seg > 0 else self._opciones_activas[0]
 
-            _crear_boton(
-                "btn_opc0", bx0, bx1, txt_opc0, "✅", "#4D6B53",
-                "#FDFBF7", "#5C6E52", "#E9EFE7", "#4D6B53",
-                lambda: self._ejecutar_respuesta_opcion(self._opciones_activas[0])
-            )
-            _crear_boton(
-                "btn_opc1", cx0, cx1, self._opciones_activas[1], "❌", "#B45309",
-                "#FDFBF7", "#D8D2C4", "#F5EFE6", "#B45309",
-                lambda: self._ejecutar_respuesta_opcion(self._opciones_activas[1])
-            )
+            if n_ops == 2:
+                # Modo Confirmación con 2 botones píldora (ej: Agendar / Cancelar)
+                btn_w = (self.ancho_win - 20) // 2
+                bx0 = 6
+                bx1 = bx0 + btn_w
+                cx0 = bx1 + 8
+                cx1 = self.ancho_win - 6
+
+                clave0, lbl0 = opciones_parsed[0]
+                clave1, lbl1 = opciones_parsed[1]
+
+                txt_opc0 = f"{lbl0} ({self._countdown_seg}s)" if self._countdown_seg > 0 else lbl0
+
+                _crear_boton(
+                    "btn_opc0", bx0, bx1, txt_opc0, "✅", "#4D6B53",
+                    "#FDFBF7", "#5C6E52", "#E9EFE7", "#4D6B53",
+                    lambda: self._ejecutar_respuesta_opcion(clave0)
+                )
+                _crear_boton(
+                    "btn_opc1", cx0, cx1, lbl1, "❌", "#B45309",
+                    "#FDFBF7", "#D8D2C4", "#F5EFE6", "#B45309",
+                    lambda: self._ejecutar_respuesta_opcion(clave1)
+                )
+            else:
+                # Modo con 3 opciones dinámicas (ej: Sigo aquí / Pausa 10 min / Estoy leyendo)
+                btn_w = (self.ancho_win - 20) // 3
+                coords = [
+                    (5, 5 + btn_w),
+                    (5 + btn_w + 5, 5 + 2 * btn_w + 5),
+                    (5 + 2 * btn_w + 10, self.ancho_win - 5),
+                ]
+                iconos = ["✅", "⏸", "📖"]
+                colores_txt = ["#4D6B53", "#B45309", "#5D584C"]
+                bordes = ["#5C6E52", "#D8D2C4", "#D8D2C4"]
+                hovers_bg = ["#E9EFE7", "#F5EFE6", "#EAE5DC"]
+                hovers_border = ["#4D6B53", "#B45309", "#5D584C"]
+
+                for i, (clave, lbl) in enumerate(opciones_parsed[:3]):
+                    x0, x1 = coords[i]
+                    txt_btn = f"{lbl} ({self._countdown_seg}s)" if (i == 0 and self._countdown_seg > 0) else lbl
+                    _crear_boton(
+                        f"btn_opc{i}", x0, x1, txt_btn, iconos[i], colores_txt[i],
+                        "#FDFBF7", bordes[i], hovers_bg[i], hovers_border[i],
+                        (lambda c=clave: self._ejecutar_respuesta_opcion(c)),
+                    )
 
             if self._countdown_seg > 0:
                 self._timer_countdown_id = self.root.after(1000, self._tick_countdown)
 
         else:
-            # Modo Estándar de 3 botones
+            # Modo Estándar de 3 botones (10m / Hablar / +15m)
             btn_w = (self.ancho_win - 26) // 3
             bx0 = 5
             bx1 = bx0 + btn_w
@@ -435,25 +478,27 @@ class MascotaFlotanteNativa:
         if self._countdown_seg > 1:
             self._countdown_seg -= 1
             if self._opciones_activas:
-                self.canvas_burbuja.itemconfig("btn_opc0_txt", text=f"✅ {self._opciones_activas[0]} ({self._countdown_seg}s)")
+                clave0, lbl0 = _parse_opcion(self._opciones_activas[0])
+                self.canvas_burbuja.itemconfig("btn_opc0_txt", text=f"✅ {lbl0} ({self._countdown_seg}s)")
             self._timer_countdown_id = self.root.after(1000, self._tick_countdown)
         else:
             self._countdown_seg = 0
             if self._opciones_activas:
-                self._ejecutar_respuesta_opcion(self._opciones_activas[0])
+                clave0, _ = _parse_opcion(self._opciones_activas[0])
+                self._ejecutar_respuesta_opcion(clave0)
 
     def _ejecutar_respuesta_opcion(self, opcion: str) -> None:
         """Ejecuta la opción seleccionada (manual o por cuenta regresiva)."""
         if self._timer_countdown_id:
             self.root.after_cancel(self._timer_countdown_id)
             self._timer_countdown_id = None
-        opciones_previas = list(self._opciones_activas)
+        clave, _ = _parse_opcion(opcion)
         self._opciones_activas = []
 
         def _post():
             try:
                 url = f"http://127.0.0.1:{self.puerto}/api/pet/responder"
-                data = json.dumps({"respuesta": opcion}).encode("utf-8")
+                data = json.dumps({"respuesta": clave}).encode("utf-8")
                 req = urllib.request.Request(
                     url, data=data, headers={"Content-Type": "application/json", "User-Agent": "YFG-PetNative"}
                 )
@@ -465,10 +510,10 @@ class MascotaFlotanteNativa:
         import threading
         threading.Thread(target=_post, daemon=True).start()
 
-        if "cancel" in opcion.lower():
-            self._mostrar_burbuja("Cancelado. No agendé nada.")
-        else:
+        if clave.lower() in ("agendar", "confirmar"):
             self._mostrar_burbuja("¡Listo! Agendado con éxito.")
+        elif clave.lower() in ("cancelar", "cancel"):
+            self._mostrar_burbuja("Cancelado. No agendé nada.")
 
     def _mostrar_resumen(self, texto_original: str) -> None:
         """Contrae el mensaje largo a un resumen conciso tras 30s."""

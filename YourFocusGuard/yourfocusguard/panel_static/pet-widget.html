@@ -55,9 +55,17 @@
       transition: all 220ms cubic-bezier(0.2, 0, 0, 1);
       pointer-events: auto;
       z-index: 10;
+      overflow: hidden !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
       word-break: break-word;
       overflow-wrap: anywhere;
       box-sizing: border-box;
+    }
+    .bubble::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
     }
     .bubble.visible {
       opacity: 1;
@@ -286,6 +294,18 @@
 
       let countdownInterval = null;
 
+      function parseOpcion(op) {
+        if (Array.isArray(op)) {
+          return { clave: String(op[0] || "").trim(), etiqueta: String(op[1] || op[0] || "").trim() };
+        }
+        if (typeof op === "string" && op.includes(",")) {
+          const parts = op.split(",");
+          return { clave: parts[0].trim(), etiqueta: parts.slice(1).join(",").trim() };
+        }
+        const s = String(op || "").trim();
+        return { clave: s, etiqueta: s };
+      }
+
       function mostrarBurbuja(texto, opciones = [], duracionMs = 5000, autoConfirmarSeg = 0, esResumen = false) {
         if (!texto) {
           bubbleEl.classList.remove("visible");
@@ -299,18 +319,20 @@
 
         if (Array.isArray(opciones) && opciones.length > 0) {
           let segRestantes = autoConfirmarSeg || 0;
-          opciones.forEach((op, idx) => {
+          const opsParsed = opciones.map(parseOpcion);
+          opsParsed.forEach((item, idx) => {
             const btn = document.createElement("button");
             btn.className = "bubble-btn";
             btn.id = `bubble-opc-${idx}`;
-            btn.textContent = (idx === 0 && segRestantes > 0) ? `✅ ${op} (${segRestantes}s)` : (idx === 1 ? `❌ ${op}` : op);
+            const icono = (idx === 0) ? "✅ " : (idx === 1 ? "❌ " : (idx === 2 ? "📖 " : ""));
+            btn.textContent = (idx === 0 && segRestantes > 0) ? `${icono}${item.etiqueta} (${segRestantes}s)` : `${icono}${item.etiqueta}`;
             btn.onclick = (e) => {
               e.stopPropagation();
               if (countdownInterval) clearInterval(countdownInterval);
               fetch("/api/pet/responder", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ respuesta: op })
+                body: JSON.stringify({ respuesta: item.clave })
               }).catch(() => {});
               bubbleEl.classList.remove("visible");
             };
@@ -322,7 +344,7 @@
               segRestantes -= 1;
               const btn0 = document.getElementById("bubble-opc-0");
               if (btn0) {
-                btn0.textContent = `✅ ${opciones[0]} (${segRestantes}s)`;
+                btn0.textContent = `✅ ${opsParsed[0].etiqueta} (${segRestantes}s)`;
               }
               if (segRestantes <= 0) {
                 clearInterval(countdownInterval);
@@ -336,7 +358,7 @@
         if (bubbleTimeout) clearTimeout(bubbleTimeout);
         if (resumenTimeout) clearTimeout(resumenTimeout);
 
-        if (!esResumen && (texto.length > 60 && (!opciones || opciones.length === 0))) {
+        if (!esResumen && (texto.length > 50 && (!opciones || opciones.length === 0))) {
           resumenTimeout = setTimeout(() => {
             const breve = resumirTexto(texto);
             mostrarBurbuja(breve, opciones, 0, 0, true);
