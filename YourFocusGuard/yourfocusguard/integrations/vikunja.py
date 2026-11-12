@@ -18,11 +18,21 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("yourfocusguard.integrations.vikunja")
 
+_PATRONES_NEGACION_AGENDA = [
+    re.compile(r"\bno\s+(?:te\s+dije|quiero|agendes|programes|pongas|creas|crees|hagas)\b", re.IGNORECASE),
+    re.compile(r"\b(?:no|sin)\s+agendar\b", re.IGNORECASE),
+    re.compile(r"\bno\s+(?:lo\s+)?agendes\b", re.IGNORECASE),
+    re.compile(r"\bno\s+dije\s+que\b", re.IGNORECASE),
+    re.compile(r"\bpor\s+qu[eé]\s+(?:agendaste|programaste)\b", re.IGNORECASE),
+    re.compile(r"\bqu[eé]\s+(?:tengo|hay)\s+(?:en\s+la\s+|agendado)\b", re.IGNORECASE),
+]
+
 _PATRONES_AGENDA = [
-    re.compile(r"\b(?:agenda|agendar|programa|programar)\b", re.IGNORECASE),
-    re.compile(r"\b(?:crear|agrega|nueva)\s+(?:tarea|reunion|cita)\b", re.IGNORECASE),
+    re.compile(r"^\s*(?:oye\s+)?(?:einstein\s*,?\s*)?(?:agenda|agendar|programa|programar)\b", re.IGNORECASE),
+    re.compile(r"\b(?:agenda|agendar|programa|programar)\s+(?:una|un|la|el|tarea|cita|reuni[oó]n|evento)\b", re.IGNORECASE),
+    re.compile(r"\b(?:crear|agrega|agregar|nueva|nuevo)\s+(?:la\s+|el\s+|una\s+|un\s+)?(?:tarea|reuni[oó]n|cita)\b", re.IGNORECASE),
     re.compile(r"\b(?:tarea\s+para|recordar\s+tarea)\b", re.IGNORECASE),
-    re.compile(r"\bvikunja\b", re.IGNORECASE),
+    re.compile(r"\b(?:crear\s+en|agrega\s+a)\s+vikunja\b", re.IGNORECASE),
 ]
 
 _PREFIJOS_LIMPIAR = [
@@ -38,6 +48,8 @@ def es_intencion_agenda(texto: str) -> bool:
     if not texto or len(texto.strip()) < 4:
         return False
     limpio = texto.strip().lower()
+    if any(neg.search(limpio) for neg in _PATRONES_NEGACION_AGENDA):
+        return False
     return any(p.search(limpio) for p in _PATRONES_AGENDA)
 
 

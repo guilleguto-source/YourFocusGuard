@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import tkinter as tk
 import urllib.request
 import webbrowser
@@ -21,6 +22,33 @@ COLOR_TRANSPARENTE = "#000001"
 STATIC_DIR = Path(__file__).resolve().parent / "panel_static"
 
 
+def _crear_rect_redondeado(canvas: tk.Canvas, x1: int, y1: int, x2: int, y2: int, radio: int = 6, **kwargs) -> int:
+    """Dibuja un rectángulo con esquinas redondeadas y suaves mediante Bezier en Tkinter."""
+    puntos = [
+        x1 + radio, y1,
+        x1 + radio, y1,
+        x2 - radio, y1,
+        x2 - radio, y1,
+        x2, y1,
+        x2, y1 + radio,
+        x2, y1 + radio,
+        x2, y2 - radio,
+        x2, y2 - radio,
+        x2, y2,
+        x2 - radio, y2,
+        x2 - radio, y2,
+        x1 + radio, y2,
+        x1 + radio, y2,
+        x1, y2,
+        x1, y2 - radio,
+        x1, y2 - radio,
+        x1, y1 + radio,
+        x1, y1 + radio,
+        x1, y1,
+    ]
+    return canvas.create_polygon(puntos, smooth=True, **kwargs)
+
+
 class MascotaFlotanteNativa:
     def __init__(self, mascota_id: str = "null-wisp", puerto: int = 8756, tamaño: str = "normal") -> None:
         self.puerto = puerto
@@ -31,6 +59,8 @@ class MascotaFlotanteNativa:
         self.frames: list[tk.PhotoImage] = []
         self.frame_idx = 0
         self.delay_ms = 500
+        self._timer_resumen_id = None
+        self._ultimo_texto_burbuja = ""
 
         # Ventana Tkinter
         self.root = tk.Tk()
@@ -267,50 +297,118 @@ class MascotaFlotanteNativa:
             self.canvas_pet.itemconfig(self.sprite_item, image=self.frames[self.frame_idx])
         self.root.after(self.delay_ms, self._animar)
 
-    def _mostrar_burbuja(self, texto: str) -> None:
+    def _mostrar_burbuja(self, texto: str, es_resumen: bool = False) -> None:
         self.canvas_burbuja.delete("all")
-        w = max(180, self.ancho_win - 8)
+        if not es_resumen:
+            self._ultimo_texto_burbuja = texto
+            if self._timer_resumen_id:
+                self.root.after_cancel(self._timer_resumen_id)
+                self._timer_resumen_id = None
 
-        # 1. Caja de texto / aviso superior
+        w = max(195, self.ancho_win - 10)
+        h_bubble = 0
+
+        # 1. Caja de texto / aviso superior autoajustable
         if texto:
-            h_bubble = 48
-            self.canvas_burbuja.create_rectangle(4, 2, w + 4, h_bubble, fill="#FFFFFF", outline="#D8D2C4", width=1.5)
-            self.canvas_burbuja.create_polygon(
-                (w + 8) // 2 - 4, h_bubble,
-                (w + 8) // 2 + 4, h_bubble,
-                (w + 8) // 2, h_bubble + 3,
-                fill="#FFFFFF", outline="#D8D2C4"
+            t_item = self.canvas_burbuja.create_text(
+                (w + 10) // 2, 0,
+                text=texto, width=w - 18, font=("Segoe UI", 8, "bold"), fill="#27241E", justify="center"
+            )
+            bbox = self.canvas_burbuja.bbox(t_item)
+            text_h = (bbox[3] - bbox[1]) if bbox else 26
+            h_bubble = max(34, text_h + 16)
+
+            self.canvas_burbuja.coords(t_item, (w + 10) // 2, 2 + h_bubble // 2)
+
+            bg_bubble = _crear_rect_redondeado(
+                self.canvas_burbuja, 4, 2, w + 6, h_bubble, radio=10,
+                fill="#FFFFFF", outline="#D3CCBE", width=1.5
+            )
+            self.canvas_burbuja.tag_lower(bg_bubble, t_item)
+
+            cola = self.canvas_burbuja.create_polygon(
+                (w + 10) // 2 - 5, h_bubble - 1,
+                (w + 10) // 2 + 5, h_bubble - 1,
+                (w + 10) // 2, h_bubble + 5,
+                fill="#FFFFFF", outline="#D3CCBE"
+            )
+            self.canvas_burbuja.tag_lower(cola, t_item)
+
+            # Si es texto largo, activar temporizador de 30 segundos para contraer a resumen
+            if not es_resumen and (len(texto) > 60 or "\n" in texto):
+                self._timer_resumen_id = self.root.after(30000, lambda: self._mostrar_resumen(texto))
+
+        # 2. Fila de botones modernos estilo píldora (alineados al dashboard)
+        by0 = (h_bubble + 9) if texto else 4
+        by1 = by0 + 22
+        btn_w = (self.ancho_win - 26) // 3
+
+        def _crear_boton(tag, x0, x1, texto_btn, icono, color_texto, bg_normal, border_normal, bg_hover, border_hover, accion):
+            _crear_rect_redondeado(
+                self.canvas_burbuja, x0, by0, x1, by1, radio=8,
+                fill=bg_normal, outline=border_normal, width=1.2, tags=(tag, f"{tag}_bg")
             )
             self.canvas_burbuja.create_text(
-                (w + 8) // 2, h_bubble // 2 + 1,
-                text=texto, width=w - 12, font=("Segoe UI", 6, "bold"), fill="#2F2B25"
+                (x0 + x1) // 2, (by0 + by1) // 2,
+                text=f"{icono} {texto_btn}" if icono else texto_btn,
+                font=("Segoe UI", 7, "bold"), fill=color_texto, tags=(tag, f"{tag}_txt")
             )
-
-        # 2. Fila fija de botones en la parte inferior (siempre visible)
-        by0 = 52
-        by1 = 72
-        btn_w = (self.ancho_win - 28) // 3
+            self.canvas_burbuja.tag_bind(tag, "<Button-1>", lambda e: accion())
+            self.canvas_burbuja.tag_bind(tag, "<Enter>", lambda e: (
+                self.canvas_burbuja.itemconfig(f"{tag}_bg", fill=bg_hover, outline=border_hover),
+                self.root.config(cursor="hand2")
+            ))
+            self.canvas_burbuja.tag_bind(tag, "<Leave>", lambda e: (
+                self.canvas_burbuja.itemconfig(f"{tag}_bg", fill=bg_normal, outline=border_normal),
+                self.root.config(cursor="")
+            ))
 
         # Botón 1: Pausar 10m
-        bx0 = 6
+        bx0 = 5
         bx1 = bx0 + btn_w
-        self.canvas_burbuja.create_rectangle(bx0, by0, bx1, by1, fill="#FDFBF7", outline="#D8D2C4", width=1, tags="btn_pause10")
-        self.canvas_burbuja.create_text((bx0 + bx1) // 2, (by0 + by1) // 2, text="⏸ 10m", font=("Segoe UI", 7, "bold"), fill="#B45309", tags="btn_pause10")
-        self.canvas_burbuja.tag_bind("btn_pause10", "<Button-1>", lambda e: self._enviar_control({"cmd": "pause_manual", "minutos": 10, "espera_confirmacion": True}))
+        _crear_boton(
+            "btn_pause10", bx0, bx1, "10m", "⏸", "#B45309",
+            "#FDFBF7", "#D8D2C4", "#F5EFE6", "#B45309",
+            lambda: self._enviar_control({"cmd": "pause_manual", "minutos": 10, "espera_confirmacion": True})
+        )
 
         # Botón 2: Hablar
-        cx0 = bx1 + 8
+        cx0 = bx1 + 6
         cx1 = cx0 + btn_w
-        self.canvas_burbuja.create_rectangle(cx0, by0, cx1, by1, fill="#F5F3EF", outline="#D1CABE", width=1.2, tags="btn_hablar")
-        self.canvas_burbuja.create_text((cx0 + cx1) // 2, (by0 + by1) // 2, text="🎤 Hablar", font=("Segoe UI", 7, "bold"), fill="#4A443A", tags="btn_hablar")
-        self.canvas_burbuja.tag_bind("btn_hablar", "<Button-1>", lambda e: self._hablar_con_mascota())
+        _crear_boton(
+            "btn_hablar", cx0, cx1, "Hablar", "🎤", "#2F2B25",
+            "#F5F3EF", "#D1CABE", "#EAE5DC", "#5D584C",
+            lambda: self._hablar_con_mascota()
+        )
 
         # Botón 3: Continuar +15m
-        dx0 = cx1 + 8
-        dx1 = self.ancho_win - 6
-        self.canvas_burbuja.create_rectangle(dx0, by0, dx1, by1, fill="#FDFBF7", outline="#D8D2C4", width=1, tags="btn_cont15")
-        self.canvas_burbuja.create_text((dx0 + dx1) // 2, (by0 + by1) // 2, text="▶ +15m", font=("Segoe UI", 7, "bold"), fill="#5C6E52", tags="btn_cont15")
-        self.canvas_burbuja.tag_bind("btn_cont15", "<Button-1>", lambda e: self._enviar_control({"cmd": "resume_or_extend", "minutos": 15}))
+        dx0 = cx1 + 6
+        dx1 = self.ancho_win - 5
+        _crear_boton(
+            "btn_cont15", dx0, dx1, "+15m", "▶", "#4D6B53",
+            "#FDFBF7", "#D8D2C4", "#E9EFE7", "#4D6B53",
+            lambda: self._enviar_control({"cmd": "resume_or_extend", "minutos": 15})
+        )
+
+        # 3. Ajuste dinámico de ventana según el tamaño del contenido
+        nuevo_alto_burbuja = by1 + 6
+        if self.alto_burbuja != nuevo_alto_burbuja:
+            self.alto_burbuja = nuevo_alto_burbuja
+            self.alto_win = self.alto_burbuja + self.alto_pet
+            cur_x = self.root.winfo_x()
+            cur_y = self.root.winfo_y()
+            self.root.geometry(f"{self.ancho_win}x{self.alto_win}+{cur_x}+{cur_y}")
+            self.canvas_burbuja.config(height=self.alto_burbuja)
+
+    def _mostrar_resumen(self, texto_original: str) -> None:
+        """Contrae el mensaje largo a un resumen conciso tras 30s."""
+        self._timer_resumen_id = None
+        partes = [p.strip() for p in re.split(r"[.¿?¡!\n]", texto_original) if len(p.strip()) > 3]
+        if partes and len(partes[0]) <= 45:
+            resumen = partes[0] + "…"
+        else:
+            resumen = texto_original[:38].strip() + "…"
+        self._mostrar_burbuja(resumen, es_resumen=True)
 
     def _enviar_control(self, payload: dict) -> None:
         def _post():

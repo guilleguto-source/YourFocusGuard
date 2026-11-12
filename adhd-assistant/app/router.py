@@ -92,6 +92,22 @@ class Router:
 
         # ----------------- 1. Reglas Rápidas (0 ms) -----------------
 
+        # Guardarraíl de negación / queja sobre agendamientos ("no te dije que agenda", "no agendes")
+        if any(
+            re.search(p, texto_lower)
+            for p in [
+                r"\bno\s+(?:te\s+dije|quiero|agendes|programes|pongas|creas|crees|hagas)\b",
+                r"\b(?:no|sin)\s+agendar\b",
+                r"\bno\s+(?:lo\s+)?agendes\b",
+                r"\bno\s+dije\s+que\b",
+                r"\bpor\s+qu[eé]\s+(?:agendaste|programaste)\b",
+            ]
+        ):
+            return {
+                "action": "charla",
+                "response": "¡Entendido! No agendaré nada. Solo avísame si necesitas algo específico.",
+            }
+
         # Briefing diario (v0.11)
         if any(
             w in texto_lower
@@ -207,6 +223,7 @@ Clasifica la acción en UNA de las siguientes categorías JSON:
 Reglas:
 - Fechas ("start_time", "due_date") en ISO 8601 con offset -05:00 (ej: {now.year}-11-13T10:00:00-05:00). Si no hay fecha clara, null.
 - "priority": 1 a 4 (3=alta, 2=normal). "end_time" puede ser null.
+- REGLA CRÍTICA DE AGENDAMIENTO: "crear_evento" y "tarea_crear" requieren una orden explícita e imperativa del usuario (ej: "agenda cita médica mañana a las 10", "agrega tarea comprar pan"). NUNCA clasifiques como crear_evento o tarea_crear ante comentarios casuales, dudas, preguntas ("¿tengo algo agendado?") o menciones pasivas de tiempo. Ante la menor ambigüedad o charla informal, clasifica SIEMPRE como "charla".
 - Importante: tarea_crear es un PENDIENTE por hacer; nota_crear es INFORMACIÓN para recordar (códigos, ideas, datos); crear_evento tiene día/hora de cita.
 - Para "charla": "response" breve, cálida y motivadora en 1-2 frases.
 
