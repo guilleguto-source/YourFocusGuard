@@ -284,22 +284,29 @@
         return txt.slice(0, 42).trim() + "…";
       }
 
-      function mostrarBurbuja(texto, opciones = [], duracionMs = 5000, esResumen = false) {
+      let countdownInterval = null;
+
+      function mostrarBurbuja(texto, opciones = [], duracionMs = 5000, autoConfirmarSeg = 0, esResumen = false) {
         if (!texto) {
           bubbleEl.classList.remove("visible");
           if (resumenTimeout) clearTimeout(resumenTimeout);
+          if (countdownInterval) clearInterval(countdownInterval);
           return;
         }
         bubbleText.textContent = texto;
         bubbleOpciones.innerHTML = "";
+        if (countdownInterval) clearInterval(countdownInterval);
 
         if (Array.isArray(opciones) && opciones.length > 0) {
-          opciones.forEach(op => {
+          let segRestantes = autoConfirmarSeg || 0;
+          opciones.forEach((op, idx) => {
             const btn = document.createElement("button");
             btn.className = "bubble-btn";
-            btn.textContent = op;
+            btn.id = `bubble-opc-${idx}`;
+            btn.textContent = (idx === 0 && segRestantes > 0) ? `✅ ${op} (${segRestantes}s)` : (idx === 1 ? `❌ ${op}` : op);
             btn.onclick = (e) => {
               e.stopPropagation();
+              if (countdownInterval) clearInterval(countdownInterval);
               fetch("/api/pet/responder", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -309,16 +316,30 @@
             };
             bubbleOpciones.appendChild(btn);
           });
+
+          if (segRestantes > 0) {
+            countdownInterval = setInterval(() => {
+              segRestantes -= 1;
+              const btn0 = document.getElementById("bubble-opc-0");
+              if (btn0) {
+                btn0.textContent = `✅ ${opciones[0]} (${segRestantes}s)`;
+              }
+              if (segRestantes <= 0) {
+                clearInterval(countdownInterval);
+                if (btn0) btn0.click();
+              }
+            }, 1000);
+          }
         }
 
         bubbleEl.classList.add("visible");
         if (bubbleTimeout) clearTimeout(bubbleTimeout);
         if (resumenTimeout) clearTimeout(resumenTimeout);
 
-        if (!esResumen && (texto.length > 60 || (opciones && opciones.length > 0))) {
+        if (!esResumen && (texto.length > 60 && (!opciones || opciones.length === 0))) {
           resumenTimeout = setTimeout(() => {
             const breve = resumirTexto(texto);
-            mostrarBurbuja(breve, opciones, 0, true);
+            mostrarBurbuja(breve, opciones, 0, 0, true);
           }, 30000);
         } else if (duracionMs > 0 && (!opciones || opciones.length === 0)) {
           bubbleTimeout = setTimeout(() => {
@@ -353,7 +374,8 @@
               mostrarBurbuja(
                 data.burbuja.texto,
                 data.burbuja.opciones || [],
-                data.burbuja.duracion || 4000
+                data.burbuja.duracion || 4000,
+                data.burbuja.auto_confirmar_seg || 0
               );
             }
           }

@@ -83,7 +83,7 @@ def pet_fijar_mascota(nombre: str) -> None:
         _PET_STATE["mascota"] = str(nombre or "null-wisp").strip()
 
 
-def pet_decir(texto: str, reaccion: str | None = None, opciones: list[str] | None = None, duracion_ms: int = 4000) -> None:
+def pet_decir(texto: str, reaccion: str | None = None, opciones: list[str] | None = None, duracion_ms: int = 4000, auto_confirmar_seg: int = 0) -> None:
     with _PET_LOCK:
         if reaccion:
             _PET_STATE["reaccion"] = str(reaccion).lower()
@@ -91,6 +91,7 @@ def pet_decir(texto: str, reaccion: str | None = None, opciones: list[str] | Non
             "texto": str(texto or "").strip(),
             "opciones": list(opciones or []),
             "duracion": int(duracion_ms),
+            "auto_confirmar_seg": int(auto_confirmar_seg),
         }
 
 
@@ -115,6 +116,7 @@ subscribe(
         reaccion=d.get("reaccion"),
         opciones=d.get("opciones"),
         duracion_ms=d.get("duracion_ms", 4000),
+        auto_confirmar_seg=d.get("auto_confirmar_seg", 0),
     )
     if isinstance(d, dict)
     else pet_decir(str(d)),

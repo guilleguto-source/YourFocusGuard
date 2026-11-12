@@ -605,25 +605,60 @@ def hablar_con_mascota_async(segundos: float = 8.0, modo_privado: bool = False) 
                 min_texto = f"{int(minutos)} minutos" if minutos == int(minutos) else f"{minutos:.1f} minutos"
                 respuesta = f"¡Entendido! Te recordaré en {min_texto}: {tarea}."
             elif es_intencion_agenda(transcripcion):
-                try:
-                    from yourfocusguard.config import load_config
-                    cfg = load_config()
-                    vk_cfg = getattr(cfg, "vikunja", None)
-                except Exception:
-                    vk_cfg = None
+                import re
+                tiene_hora = bool(re.search(r"\b(?:\d{1,2}(?::\d{2})?|\d{1,2}\s*(?:am|pm|de la mañana|de la tarde|de la noche))\b", transcripcion, re.IGNORECASE))
+                if not tiene_hora:
+                    if "mañana" in transcripcion.lower():
+                        respuesta = "¿A qué hora te hago el acuerdo mañana?"
+                    else:
+                        dias = ["lunes", "martes", "miércoles", "miercoles", "jueves", "viernes", "sábado", "sabado", "domingo"]
+                        dia_encontrado = next((d for d in dias if d in transcripcion.lower()), None)
+                        if dia_encontrado:
+                            respuesta = f"¿A qué hora comienza el evento el {dia_encontrado}?"
+                        else:
+                            respuesta = "¿A qué hora te programo el evento?"
 
-                if vk_cfg and vk_cfg.habilitado and vk_cfg.url and vk_cfg.token:
-                    ok, msg = crear_tarea(transcripcion, cfg=vk_cfg)
-                    if ok:
-                        respuesta = f"¡Agendado en Vikunja! {msg}"
+                    publish(EVT_PET_SAY, {
+                        "texto": respuesta,
+                        "reaccion": "speaking",
+                        "duracion_ms": 6000,
+                    })
+                    tts.speak(respuesta)
+                    return
+
+                from yourfocusguard.integrations.vikunja import limpiar_texto_agenda
+                titulo_tarea = limpiar_texto_agenda(transcripcion)
+                respuesta = f"¿Agendo '{titulo_tarea}'?"
+
+                publish(EVT_PET_SAY, {
+                    "texto": respuesta,
+                    "reaccion": "waiting",
+                    "opciones": ["Agendar", "Cancelar"],
+                    "auto_confirmar_seg": 15,
+                    "duracion_ms": 16000,
+                })
+                tts.speak(respuesta)
+
+                def _auto_ejecutar():
+                    time.sleep(15)
+                    try:
+                        from yourfocusguard.config import load_config
+                        cfg = load_config()
+                        vk_cfg = getattr(cfg, "vikunja", None)
+                    except Exception:
+                        vk_cfg = None
+
+                    if vk_cfg and vk_cfg.habilitado and vk_cfg.url and vk_cfg.token:
+                        ok, msg = crear_tarea(transcripcion, cfg=vk_cfg)
+                        if ok:
+                            publish(EVT_PET_SAY, {"texto": f"¡Agendado en Vikunja! {msg}", "reaccion": "idle", "duracion_ms": 4000})
                     else:
                         from yourfocusguard.storage.vault import guardar_nota_rapida
                         guardar_nota_rapida(transcripcion)
-                        respuesta = "No pude sincronizar con Vikunja, pero lo guardé en tu diario local."
-                else:
-                    from yourfocusguard.storage.vault import guardar_nota_rapida
-                    exito, _, _ = guardar_nota_rapida(transcripcion)
-                    respuesta = "¡Anotado en tu diario de tareas! Continúa enfocado. 🚀"
+                        publish(EVT_PET_SAY, {"texto": "¡Agendado en tu diario local! Continúa enfocado. 🚀", "reaccion": "idle", "duracion_ms": 4000})
+
+                threading.Thread(target=_auto_ejecutar, daemon=True).start()
+                return
             elif es_intencion_nota(transcripcion):
                 from yourfocusguard.storage.vault import guardar_nota_rapida
                 exito, resumen, _ = guardar_nota_rapida(transcripcion)

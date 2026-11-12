@@ -60,7 +60,11 @@ class MascotaFlotanteNativa:
         self.frame_idx = 0
         self.delay_ms = 500
         self._timer_resumen_id = None
+        self._timer_countdown_id = None
         self._ultimo_texto_burbuja = ""
+        self._ultimas_opciones: list[str] = []
+        self._opciones_activas: list[str] = []
+        self._countdown_seg = 0
 
         # Ventana Tkinter
         self.root = tk.Tk()
@@ -297,14 +301,18 @@ class MascotaFlotanteNativa:
             self.canvas_pet.itemconfig(self.sprite_item, image=self.frames[self.frame_idx])
         self.root.after(self.delay_ms, self._animar)
 
-    def _mostrar_burbuja(self, texto: str, es_resumen: bool = False) -> None:
+    def _mostrar_burbuja(self, texto: str, opciones: list[str] | None = None, auto_confirmar_seg: int = 0, es_resumen: bool = False) -> None:
         self.canvas_burbuja.delete("all")
         if not es_resumen:
             self._ultimo_texto_burbuja = texto
             if self._timer_resumen_id:
                 self.root.after_cancel(self._timer_resumen_id)
                 self._timer_resumen_id = None
+        if self._timer_countdown_id:
+            self.root.after_cancel(self._timer_countdown_id)
+            self._timer_countdown_id = None
 
+        self._opciones_activas = list(opciones or [])
         w = max(195, self.ancho_win - 10)
         h_bubble = 0
 
@@ -334,14 +342,13 @@ class MascotaFlotanteNativa:
             )
             self.canvas_burbuja.tag_lower(cola, t_item)
 
-            # Si es texto largo, activar temporizador de 30 segundos para contraer a resumen
-            if not es_resumen and (len(texto) > 60 or "\n" in texto):
+            # Si es texto largo sin opciones, activar temporizador de 30 segundos
+            if not es_resumen and not self._opciones_activas and (len(texto) > 60 or "\n" in texto):
                 self._timer_resumen_id = self.root.after(30000, lambda: self._mostrar_resumen(texto))
 
-        # 2. Fila de botones modernos estilo píldora (alineados al dashboard)
+        # 2. Fila de botones (opciones interactivas o botones estándar)
         by0 = (h_bubble + 9) if texto else 4
         by1 = by0 + 22
-        btn_w = (self.ancho_win - 26) // 3
 
         def _crear_boton(tag, x0, x1, texto_btn, icono, color_texto, bg_normal, border_normal, bg_hover, border_hover, accion):
             _crear_rect_redondeado(
@@ -363,32 +370,55 @@ class MascotaFlotanteNativa:
                 self.root.config(cursor="")
             ))
 
-        # Botón 1: Pausar 10m
-        bx0 = 5
-        bx1 = bx0 + btn_w
-        _crear_boton(
-            "btn_pause10", bx0, bx1, "10m", "⏸", "#B45309",
-            "#FDFBF7", "#D8D2C4", "#F5EFE6", "#B45309",
-            lambda: self._enviar_control({"cmd": "pause_manual", "minutos": 10, "espera_confirmacion": True})
-        )
+        if self._opciones_activas and len(self._opciones_activas) >= 2:
+            # Modo Confirmación con 2 botones píldora (ej: Agendar / Cancelar)
+            btn_w = (self.ancho_win - 20) // 2
+            bx0 = 6
+            bx1 = bx0 + btn_w
+            cx0 = bx1 + 8
+            cx1 = self.ancho_win - 6
 
-        # Botón 2: Hablar
-        cx0 = bx1 + 6
-        cx1 = cx0 + btn_w
-        _crear_boton(
-            "btn_hablar", cx0, cx1, "Hablar", "🎤", "#2F2B25",
-            "#F5F3EF", "#D1CABE", "#EAE5DC", "#5D584C",
-            lambda: self._hablar_con_mascota()
-        )
+            self._countdown_seg = auto_confirmar_seg if auto_confirmar_seg > 0 else 0
+            txt_opc0 = f"{self._opciones_activas[0]} ({self._countdown_seg}s)" if self._countdown_seg > 0 else self._opciones_activas[0]
 
-        # Botón 3: Continuar +15m
-        dx0 = cx1 + 6
-        dx1 = self.ancho_win - 5
-        _crear_boton(
-            "btn_cont15", dx0, dx1, "+15m", "▶", "#4D6B53",
-            "#FDFBF7", "#D8D2C4", "#E9EFE7", "#4D6B53",
-            lambda: self._enviar_control({"cmd": "resume_or_extend", "minutos": 15})
-        )
+            _crear_boton(
+                "btn_opc0", bx0, bx1, txt_opc0, "✅", "#4D6B53",
+                "#FDFBF7", "#5C6E52", "#E9EFE7", "#4D6B53",
+                lambda: self._ejecutar_respuesta_opcion(self._opciones_activas[0])
+            )
+            _crear_boton(
+                "btn_opc1", cx0, cx1, self._opciones_activas[1], "❌", "#B45309",
+                "#FDFBF7", "#D8D2C4", "#F5EFE6", "#B45309",
+                lambda: self._ejecutar_respuesta_opcion(self._opciones_activas[1])
+            )
+
+            if self._countdown_seg > 0:
+                self._timer_countdown_id = self.root.after(1000, self._tick_countdown)
+
+        else:
+            # Modo Estándar de 3 botones
+            btn_w = (self.ancho_win - 26) // 3
+            bx0 = 5
+            bx1 = bx0 + btn_w
+            _crear_boton(
+                "btn_pause10", bx0, bx1, "10m", "⏸", "#B45309",
+                "#FDFBF7", "#D8D2C4", "#F5EFE6", "#B45309",
+                lambda: self._enviar_control({"cmd": "pause_manual", "minutos": 10, "espera_confirmacion": True})
+            )
+            cx0 = bx1 + 6
+            cx1 = cx0 + btn_w
+            _crear_boton(
+                "btn_hablar", cx0, cx1, "Hablar", "🎤", "#2F2B25",
+                "#F5F3EF", "#D1CABE", "#EAE5DC", "#5D584C",
+                lambda: self._hablar_con_mascota()
+            )
+            dx0 = cx1 + 6
+            dx1 = self.ancho_win - 5
+            _crear_boton(
+                "btn_cont15", dx0, dx1, "+15m", "▶", "#4D6B53",
+                "#FDFBF7", "#D8D2C4", "#E9EFE7", "#4D6B53",
+                lambda: self._enviar_control({"cmd": "resume_or_extend", "minutos": 15})
+            )
 
         # 3. Ajuste dinámico de ventana según el tamaño del contenido
         nuevo_alto_burbuja = by1 + 6
@@ -399,6 +429,46 @@ class MascotaFlotanteNativa:
             cur_y = self.root.winfo_y()
             self.root.geometry(f"{self.ancho_win}x{self.alto_win}+{cur_x}+{cur_y}")
             self.canvas_burbuja.config(height=self.alto_burbuja)
+
+    def _tick_countdown(self) -> None:
+        """Actualiza la cuenta regresiva de 15s en el botón de confirmación."""
+        if self._countdown_seg > 1:
+            self._countdown_seg -= 1
+            if self._opciones_activas:
+                self.canvas_burbuja.itemconfig("btn_opc0_txt", text=f"✅ {self._opciones_activas[0]} ({self._countdown_seg}s)")
+            self._timer_countdown_id = self.root.after(1000, self._tick_countdown)
+        else:
+            self._countdown_seg = 0
+            if self._opciones_activas:
+                self._ejecutar_respuesta_opcion(self._opciones_activas[0])
+
+    def _ejecutar_respuesta_opcion(self, opcion: str) -> None:
+        """Ejecuta la opción seleccionada (manual o por cuenta regresiva)."""
+        if self._timer_countdown_id:
+            self.root.after_cancel(self._timer_countdown_id)
+            self._timer_countdown_id = None
+        opciones_previas = list(self._opciones_activas)
+        self._opciones_activas = []
+
+        def _post():
+            try:
+                url = f"http://127.0.0.1:{self.puerto}/api/pet/responder"
+                data = json.dumps({"respuesta": opcion}).encode("utf-8")
+                req = urllib.request.Request(
+                    url, data=data, headers={"Content-Type": "application/json", "User-Agent": "YFG-PetNative"}
+                )
+                with urllib.request.urlopen(req, timeout=1.0):
+                    pass
+            except Exception as e:
+                log.debug("Error respondiendo opción: %s", e)
+
+        import threading
+        threading.Thread(target=_post, daemon=True).start()
+
+        if "cancel" in opcion.lower():
+            self._mostrar_burbuja("Cancelado. No agendé nada.")
+        else:
+            self._mostrar_burbuja("¡Listo! Agendado con éxito.")
 
     def _mostrar_resumen(self, texto_original: str) -> None:
         """Contrae el mensaje largo a un resumen conciso tras 30s."""
@@ -455,7 +525,12 @@ class MascotaFlotanteNativa:
                     self._actualizar_frames()
 
                 burbuja = data.get("burbuja", {})
-                self._mostrar_burbuja(burbuja.get("texto", ""))
+                txt_burbuja = burbuja.get("texto", "")
+                opciones = burbuja.get("opciones", [])
+                auto_seg = burbuja.get("auto_confirmar_seg", 0)
+                if txt_burbuja != self._ultimo_texto_burbuja or opciones != self._ultimas_opciones:
+                    self._ultimas_opciones = list(opciones)
+                    self._mostrar_burbuja(txt_burbuja, opciones=opciones, auto_confirmar_seg=auto_seg)
         except Exception:
             pass
         finally:

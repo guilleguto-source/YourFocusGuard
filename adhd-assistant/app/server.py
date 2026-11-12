@@ -222,15 +222,38 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             response_payload = {"action": action, "status": "ok"}
 
             if action == "crear_evento":
-                res = calendar.create_event(
-                    summary=result.get("summary", message),
-                    start_time=result.get("start_time"),
-                    end_time=result.get("end_time"),
-                    description=result.get("description", ""),
-                    location=result.get("location", ""),
-                )
-                response_payload["message"] = res.get("message")
-                response_payload["event"] = res
+                summary = result.get("summary", message)
+                start_time = result.get("start_time")
+                end_time = result.get("end_time")
+
+                dt_inicio = None
+                if start_time:
+                    try:
+                        from datetime import datetime, timedelta
+                        dt_inicio = datetime.fromisoformat(start_time)
+                    except Exception:
+                        dt_inicio = None
+
+                fecha_txt = utilidades.formatear_fecha_hora_es(dt_inicio) if dt_inicio else (start_time or "próximamente")
+                if dt_inicio and not end_time:
+                    dt_fin = dt_inicio + timedelta(hours=1)
+                    end_time = dt_fin.isoformat()
+                    hora_fin = utilidades.formatear_hora_es(dt_fin)
+                    msg_propuesta = f"¿Agendo '{summary}' para el {fecha_txt} (hasta las {hora_fin})?"
+                else:
+                    msg_propuesta = f"¿Agendo '{summary}' para el {fecha_txt}?"
+
+                response_payload["action"] = "confirmar_evento"
+                response_payload["message"] = msg_propuesta
+                response_payload["propuesta"] = {
+                    "summary": summary,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "description": result.get("description", ""),
+                    "location": result.get("location", ""),
+                }
+                response_payload["auto_confirmar_seg"] = 15
+                response_payload["opciones"] = ["Agendar", "Cancelar"]
 
             elif action == "tarea_crear":
                 res = tasks_mgr.add_task(
@@ -332,6 +355,31 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             query = payload.get("query", "lofi beats")
             res = audio_engine.search_youtube(query)
             self._send_json(200, res)
+            return
+
+        if url_path == "/api/calendario/confirmar":
+            summary = payload.get("summary", "Evento")
+            start_time = payload.get("start_time")
+            end_time = payload.get("end_time")
+            res = calendar.create_event(
+                summary=summary,
+                start_time=start_time,
+                end_time=end_time,
+                description=payload.get("description", ""),
+                location=payload.get("location", ""),
+            )
+            self._send_json(200, {
+                "status": "ok",
+                "message": res.get("message", f"¡Listo! Agendé '{summary}' en Google Calendar."),
+                "event": res
+            })
+            return
+
+        if url_path == "/api/calendario/cancelar":
+            self._send_json(200, {
+                "status": "ok",
+                "message": "Agendamiento cancelado. No se creó ningún evento.",
+            })
             return
 
         self._send_json(404, {"status": "error", "message": "Ruta no encontrada"})

@@ -108,6 +108,22 @@ class Router:
                 "response": "¡Entendido! No agendaré nada. Solo avísame si necesitas algo específico.",
             }
 
+        # Aclaración interactiva si falta la hora al pedir agendar o recordar
+        if any(w in texto_lower for w in ["recuerdame", "recuérdame", "acuerdame", "acuérdame", "agenda", "agendar", "cita", "reunion", "reunión"]) and not (" en " in texto_lower and any(u in texto_lower for u in ["minuto", "min", "hora", "segundo"])):
+            tiene_hora = bool(re.search(r"\b(?:\d{1,2}(?::\d{2})?|\d{1,2}\s*(?:am|pm|de la mañana|de la tarde|de la noche))\b", texto_lower))
+            if not tiene_hora:
+                if "mañana" in texto_lower:
+                    return {
+                        "action": "charla",
+                        "response": "¿A qué hora te hago el acuerdo mañana?",
+                    }
+                for dia in ["lunes", "martes", "miércoles", "miercoles", "jueves", "viernes", "sábado", "sabado", "domingo"]:
+                    if dia in texto_lower:
+                        return {
+                            "action": "charla",
+                            "response": f"¿A qué hora comienza el evento el {dia}?",
+                        }
+
         # Briefing diario (v0.11)
         if any(
             w in texto_lower
@@ -224,6 +240,7 @@ Reglas:
 - Fechas ("start_time", "due_date") en ISO 8601 con offset -05:00 (ej: {now.year}-11-13T10:00:00-05:00). Si no hay fecha clara, null.
 - "priority": 1 a 4 (3=alta, 2=normal). "end_time" puede ser null.
 - REGLA CRÍTICA DE AGENDAMIENTO: "crear_evento" y "tarea_crear" requieren una orden explícita e imperativa del usuario (ej: "agenda cita médica mañana a las 10", "agrega tarea comprar pan"). NUNCA clasifiques como crear_evento o tarea_crear ante comentarios casuales, dudas, preguntas ("¿tengo algo agendado?") o menciones pasivas de tiempo. Ante la menor ambigüedad o charla informal, clasifica SIEMPRE como "charla".
+- Si un evento tiene hora de inicio pero no especifica fin o duración, calcula "end_time" sumando 1 hora a "start_time". Si no se especificó hora exacta en absoluto, clasifica como "charla" y pregunta amablemente la hora (ej: "¿A qué hora te hago el acuerdo mañana?").
 - Importante: tarea_crear es un PENDIENTE por hacer; nota_crear es INFORMACIÓN para recordar (códigos, ideas, datos); crear_evento tiene día/hora de cita.
 - Para "charla": "response" breve, cálida y motivadora en 1-2 frases.
 

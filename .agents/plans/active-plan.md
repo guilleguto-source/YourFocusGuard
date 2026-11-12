@@ -1,22 +1,26 @@
-# Plan Activo: Corrección UI Mascota Nativa y Guardarraíles de Agenda
+# Plan Activo: Confirmación Escrita con Cuenta Regresiva (15s) y Diálogo de Aclaración
 
 ## Contexto Digerido
-1. Mascota flotante de escritorio (`desktop_pet_native.py`) adaptada con botones píldora modernos (paleta dashboard), bordes redondeados y microinteracciones hover.
-2. Burbujas con auto-altura y cero scrollbars en mascota nativa y widget embebido (`pet-widget.html`).
-3. Temporizador de 30s implementado: tras 30s los textos largos se contraen a una cápsula compacta con resumen.
-4. Falsos positivos de agendamiento erradicados en `vikunja.py` (filtro de negaciones y exigencia imperativa) y `router.py` (guardarraíl de charla ante dudas/negaciones).
+1. Confirmación explícita previa a inserción en agenda: propuesta formateada en lenguaje natural.
+2. Botones interactivos [ ✅ Agendar (15s) ] y [ ❌ Cancelar ] con auto-aceptación si expiran los 15s.
+3. Diálogo de aclaración cuando falten horas ("¿A qué hora te hago el acuerdo mañana?") o cálculo automático de fin (+1h) si falta duración.
+4. Soporte sincronizado en Mascota Nativa (Tkinter), Widget Embebido (HTML/JS) y Web Dashboard.
 
 ## Archivos Afectados
-- `YourFocusGuard/yourfocusguard/desktop_pet_native.py`: botones modernos estilo dashboard, burbuja autoajustable sin scroll, temporizador 30s con texto resumen.
-- `YourFocusGuard/yourfocusguard/panel_static/pet-widget.html`: eliminación de scrollbar, flex autoajustable y timer 30s a resumen.
-- `YourFocusGuard/yourfocusguard/integrations/vikunja.py`: regex imperativa estricta en `_PATRONES_AGENDA` con exclusión de negaciones.
-- `adhd-assistant/app/router.py`: regla estricta anti-agendamiento sin orden explícita y descarte de negaciones.
+- `adhd-assistant/app/router.py`: reglas de aclaración si falta hora + instrucción de duración en prompt.
+- `adhd-assistant/app/server.py`: emisión de propuesta `confirmar_evento` + endpoints `/api/calendario/confirmar` y `/cancelar`.
+- `adhd-assistant/app/ui/` (`app.js`, `style.css`): banner interactivo con countdown 15s.
+- `YourFocusGuard/yourfocusguard/desktop_pet_native.py`: renderizado de botones de opción en burbuja + tick countdown 15s.
+- `YourFocusGuard/yourfocusguard/panel_static/pet-widget.html`: soporte countdown 15s en widget embebido.
+- `YourFocusGuard/yourfocusguard/panel.py`: propagación de `auto_confirmar_seg` en `pet_decir`.
+- `YourFocusGuard/yourfocusguard/actions/groq_voice.py`: aclaración cuando falta hora y propuesta con 15s auto-confirm.
 
 ## Checklist de Despliegue
-- [x] Refactorizar `desktop_pet_native.py` (estilos canvas, auto-altura, auto-colapso 30s).
-- [x] Refactorizar `pet-widget.html` (CSS sin overflow/scrollbar, JS timer 30s).
-- [x] Endurecer `vikunja.py` contra falsos positivos de agendamiento.
-- [x] Endurecer prompt y reglas de `router.py` para `crear_evento`.
-- [x] Probar visualmente renderizado de mascota y probar frases trampa en router.
+- [x] Implementar aclaraciones y guardarraíles en `router.py`.
+- [x] Endpoints y propuesta en `server.py`.
+- [x] Banner interactivo con temporizador en `app.js` y `style.css`.
+- [x] Botones de confirmación y contador 15s en `desktop_pet_native.py`.
+- [x] Soporte countdown en `pet-widget.html` y `panel.py`.
+- [x] Diálogo de aclaración de voz en `groq_voice.py`.
 - [x] Ejecutar suite de pruebas (101/101 OK).
 - [x] Git commit y push.

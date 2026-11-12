@@ -296,6 +296,11 @@ async function processMessage(text) {
     });
     const data = await resp.json();
 
+    if (data.action === 'confirmar_evento') {
+      mostrarConfirmacionAgendamiento(data);
+      return;
+    }
+
     statusIndicator.className = 'status-indicator success';
     statusIndicator.textContent = `✅ ${data.message || 'Acción completada'}`;
     showToast(data.message || 'Comando ejecutado con éxito');
@@ -320,6 +325,96 @@ async function processMessage(text) {
     statusIndicator.textContent = '⚠️ Error conectando con el asistente.';
     showToast('Error procesando comando', 'error');
   }
+}
+
+let confirmInterval = null;
+
+function mostrarConfirmacionAgendamiento(data) {
+  statusIndicator.className = 'status-indicator warning';
+  statusIndicator.textContent = `⏳ ${data.message}`;
+  speakResponse(data.message);
+
+  let segRestantes = data.auto_confirmar_seg || 15;
+  const propuesta = data.propuesta || {};
+
+  let banner = document.getElementById('confirmAgendaBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'confirmAgendaBanner';
+    banner.className = 'confirm-agenda-banner';
+    const container = document.querySelector('.card.chat-card') || document.body;
+    container.insertBefore(banner, container.firstChild);
+  }
+
+  banner.innerHTML = `
+    <div class="confirm-agenda-content">
+      <div class="confirm-agenda-text">
+        <span class="confirm-icon">📅</span>
+        <span>${data.message}</span>
+      </div>
+      <div class="confirm-agenda-actions">
+        <button id="btnConfirmarSi" class="btn-confirm-yes">✅ Agendar (${segRestantes}s)</button>
+        <button id="btnConfirmarNo" class="btn-confirm-no">❌ Cancelar</button>
+      </div>
+    </div>
+  `;
+
+  if (confirmInterval) clearInterval(confirmInterval);
+
+  async function ejecutarConfirmacion() {
+    if (confirmInterval) clearInterval(confirmInterval);
+    if (banner) banner.remove();
+    statusIndicator.className = 'status-indicator processing';
+    statusIndicator.textContent = '⏳ Agendando evento en Google Calendar...';
+    try {
+      const resp = await fetch('/api/calendario/confirmar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(propuesta)
+      });
+      const resData = await resp.json();
+      statusIndicator.className = 'status-indicator success';
+      statusIndicator.textContent = `✅ ${resData.message || 'Evento agendado'}`;
+      showToast(resData.message || 'Evento guardado en Google Calendar');
+      speakResponse(resData.message || 'Listo, evento agendado.');
+      loadTasks();
+    } catch (e) {
+      statusIndicator.className = 'status-indicator';
+      statusIndicator.textContent = '⚠️ Error agendando evento.';
+    }
+  }
+
+  async function cancelarConfirmacion() {
+    if (confirmInterval) clearInterval(confirmInterval);
+    if (banner) banner.remove();
+    statusIndicator.className = 'status-indicator';
+    statusIndicator.textContent = '❌ Agendamiento cancelado.';
+    showToast('Agendamiento cancelado');
+    speakResponse('Agendamiento cancelado. No agendé nada.');
+    try {
+      await fetch('/api/calendario/cancelar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(propuesta)
+      });
+    } catch (e) {}
+  }
+
+  const btnSi = document.getElementById('btnConfirmarSi');
+  const btnNo = document.getElementById('btnConfirmarNo');
+  if (btnSi) btnSi.onclick = ejecutarConfirmacion;
+  if (btnNo) btnNo.onclick = cancelarConfirmacion;
+
+  confirmInterval = setInterval(() => {
+    segRestantes -= 1;
+    const btnAct = document.getElementById('btnConfirmarSi');
+    if (btnAct) {
+      btnAct.textContent = `✅ Agendar (${segRestantes}s)`;
+    }
+    if (segRestantes <= 0) {
+      ejecutarConfirmacion();
+    }
+  }, 1000);
 }
 
 // --- Voz neuronal (edge-tts vía servidor) con fallback al navegador ---
