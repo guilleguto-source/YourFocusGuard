@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YourFocusGuard • Asistente TDAH Inteligente</title>
+  <title>FocusGuard • Asistente TDAH Inteligente</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,6 +23,7 @@
       <div class="sync-badges">
         <span class="badge badge-google" id="badgeGoogle">● Google Calendar & Tasks</span>
         <span class="badge badge-vikunja" id="badgeVikunja">● Vikunja Local</span>
+        <button id="btnSaludTop" class="badge badge-salud" title="Ver estado del sistema">● v<span id="versionTag">?</span></button>
       </div>
     </header>
 
@@ -49,43 +50,77 @@
 
       <!-- Quick Text Input -->
       <form id="textForm" class="text-input-bar">
-        <input type="text" id="userInput" placeholder="Ej: 'anota que debo entregar el informe mañana', 'alarma en 45 min', 'pon lofi'..." autocomplete="off">
+        <input type="text" id="userInput" placeholder="Ej: 'anota que debo entregar el informe', 'resumen del día', 'alarma en 45 min', 'pon lofi'..." autocomplete="off">
         <button type="submit" class="send-btn ripple-btn">
           <span>Enviar</span>
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg>
         </button>
       </form>
+
+      <!-- v0.11: Briefing diario rápido -->
+      <div class="quick-actions">
+        <button id="btnBriefing" class="quick-btn ripple-btn">☀️ Resumen del día</button>
+      </div>
     </section>
 
     <!-- Content Grid -->
     <div class="content-grid">
-      <!-- Columna 1: Tareas y Cronograma Dual -->
-      <section class="card tasks-card">
-        <div class="card-header">
-          <div class="title-wrap">
-            <h2>📋 Mis Pendientes y Prioridades</h2>
-            <span class="subtitle">Sincronizado en tiempo real (Google & Vikunja)</span>
+      <!-- Columna 1: Tareas + Memoria -->
+      <div class="main-column">
+        <section class="card tasks-card">
+          <div class="card-header">
+            <div class="title-wrap">
+              <h2>📋 Mis Pendientes y Prioridades</h2>
+              <span class="subtitle">Sincronizado en tiempo real (Google & Vikunja)</span>
+            </div>
+            <div class="header-btns">
+              <button id="btnSyncCal" class="icon-btn ripple-btn" title="Sincronizar tareas con Google Calendar (bidireccional)">🔄</button>
+              <button id="btnRefreshTasks" class="icon-btn ripple-btn" title="Actualizar">↻</button>
+            </div>
           </div>
-          <button id="btnRefreshTasks" class="icon-btn ripple-btn" title="Actualizar">↻</button>
-        </div>
 
-        <div class="add-task-bar">
-          <input type="text" id="newTaskInput" placeholder="Añadir nueva tarea...">
-          <select id="newTaskPriority">
-            <option value="2">⚡ Normal</option>
-            <option value="3">🔥 Alta</option>
-            <option value="4">🚨 Urgente</option>
-            <option value="1">☕ Baja</option>
-          </select>
-          <button id="btnAddTask" class="action-btn ripple-btn">+ Añadir</button>
-        </div>
+          <div class="add-task-bar">
+            <input type="text" id="newTaskInput" placeholder="Añadir nueva tarea...">
+            <select id="newTaskPriority">
+              <option value="2">⚡ Normal</option>
+              <option value="3">🔥 Alta</option>
+              <option value="4">🚨 Urgente</option>
+              <option value="1">☕ Baja</option>
+            </select>
+            <button id="btnAddTask" class="action-btn ripple-btn">+ Añadir</button>
+          </div>
 
-        <ul class="task-list" id="taskList">
-          <li class="loading-item">Cargando tareas sincronizadas...</li>
-        </ul>
-      </section>
+          <ul class="task-list" id="taskList">
+            <li class="loading-item">Cargando tareas sincronizadas...</li>
+          </ul>
+        </section>
 
-      <!-- Columna 2: Audio & Enfoque TDAH + Alarmas -->
+        <!-- v0.11: Memoria / Segundo cerebro -->
+        <section class="card memoria-card">
+          <div class="card-header">
+            <div class="title-wrap">
+              <h2>🧠 Mi Memoria</h2>
+              <span class="subtitle">Notas rápidas que puedes buscar por voz o texto</span>
+            </div>
+            <button id="btnRefreshNotas" class="icon-btn ripple-btn" title="Actualizar">↻</button>
+          </div>
+
+          <div class="nota-captura">
+            <input type="text" id="notaInput" placeholder="Captura rápida: 'el código de la puerta es 1234'...">
+            <button id="btnGuardarNota" class="action-btn ripple-btn">💾 Guardar</button>
+          </div>
+
+          <div class="nota-busqueda">
+            <input type="text" id="notaBuscarInput" placeholder="🔍 Buscar en tus notas (ej: 'wifi', 'puerta', 'podcast')...">
+          </div>
+
+          <div class="notas-list" id="notasList">
+            <div class="empty-state">Aún no tienes notas. Anota ideas, códigos o datos y búscalos cuando los necesites.</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Columna 2: Audio & Enfoque TDAH + Alarmas + Salud -->
       <div class="side-column">
         <!-- Audio Player Card -->
         <section class="card audio-card">
@@ -144,6 +179,34 @@
             <div class="empty-state">No hay alarmas activas en este momento.</div>
           </div>
         </section>
+
+        <!-- v0.12: Estado del sistema -->
+        <section class="card salud-card">
+          <div class="card-header">
+            <div class="title-wrap">
+              <h2>🩺 Estado del Sistema</h2>
+              <span class="subtitle" id="saludUptime">Diagnóstico en vivo</span>
+            </div>
+          </div>
+          <div class="salud-chips" id="saludList">
+            <div class="empty-state">Cargando diagnóstico...</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.11: Modal de Briefing Diario -->
+  <div id="briefingModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>☀️ Tu Resumen del Día</h3>
+        <button id="btnCerrarBriefing" class="icon-btn ripple-btn" title="Cerrar">✕</button>
+      </div>
+      <div id="briefingTexto" class="modal-body"></div>
+      <div class="modal-footer">
+        <button id="btnEscucharBriefing" class="action-btn ripple-btn">🔊 Escuchar</button>
+        <button id="btnCerrarBriefing2" class="control-btn ripple-btn">Cerrar</button>
       </div>
     </div>
   </div>

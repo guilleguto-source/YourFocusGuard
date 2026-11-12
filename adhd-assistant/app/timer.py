@@ -5,6 +5,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
+from utilidades import formatear_fecha_hora_es, formatear_hora_es
+
 logger = logging.getLogger(__name__)
 
 active_timers: List[Dict[str, Any]] = []
@@ -24,6 +26,10 @@ class TimerManager:
             "label": label,
             "duration": duration_seconds,
             "target_time": target_time.strftime("%H:%M:%S"),
+            # v0.10: fecha completa (antes solo HH:MM:SS y las alarmas de +24 h
+            # se veían raras, p.ej. 'alarma a las 03:10' sin decir qué día)
+            "target_fecha": formatear_fecha_hora_es(target_time),
+            "target_iso": target_time.isoformat(),
             "status": "active",
         }
         active_timers.append(record)
@@ -48,15 +54,30 @@ class TimerManager:
 
         return {
             "status": "ok",
-            "message": f"Alarma programada en {' '.join(tiempo_texto)} ({target_time.strftime('%H:%M:%S')}): '{label}'",
+            "message": (
+                f"Alarma programada en {' '.join(tiempo_texto)} "
+                f"({formatear_fecha_hora_es(target_time)}): '{label}'"
+            ),
             "target_time": target_time.strftime("%H:%M:%S"),
+            "target_fecha": record["target_fecha"],
         }
 
     def _run_timer(self, duration: float, label: str, record: dict):
         time.sleep(duration)
+        # Marcar terminado ANTES de la señal para que la UI lo detecte
         record["status"] = "finished"
+        record["announced"] = False
+        # v0.10: momento exacto de vencimiento con fecha completa
+        vencimiento = datetime.now()
+        record["finished_fecha"] = formatear_fecha_hora_es(vencimiento)
+        record["mensaje_hablado"] = (
+            f"¡Se acabó el tiempo! {label}. "
+            f"Son las {formatear_hora_es(vencimiento)} del {formatear_fecha_hora_es(vencimiento).split(', ')[0]}."
+        )
+
         print(f"\n" + "🔔" * 20, flush=True)
         print(f"⏰ ¡ALARMA / RECORDATORIO!: {label}", flush=True)
+        print(f"   📅 {record['finished_fecha']}", flush=True)
         print("🔔" * 20 + "\n", flush=True)
 
         # Sonar beep o audio si está disponible
@@ -70,3 +91,20 @@ class TimerManager:
 
     def list_active_timers(self) -> List[Dict[str, Any]]:
         return [t for t in active_timers if t["status"] == "active"]
+
+    def pop_finished_unannounced(self) -> List[Dict[str, Any]]:
+        """Devuelve las alarmas vencidas aún no anunciadas y las marca.
+
+        La UI hace polling a /api/timers/announce cada pocos segundos; al
+        recibir una alarma la reproduce con voz neuronal y beep en el
+        navegador (visible aunque la consola esté cerrada).
+        """
+        pendientes = []
+        for t in active_timers:
+            if t["status"] == "finished" and not t.get("announced"):
+                t["announced"] = True
+                pendientes.append(dict(t))
+        # Limpieza: mantener la lista acotada (máx. 20 registros viejos)
+        if len(active_timers) > 20:
+            del active_timers[: len(active_timers) - 20]
+        return pendientes

@@ -1,9 +1,22 @@
-groq>=0.8.0
-google-generativeai>=0.8.0
-faster-whisper>=1.0.0
+# ============================================================
+# Asistente TDAH v0.12 — dependencias REALES del código
+# (antes incluía redis, spotipy, gemini, groq SDK, pydub,
+#  requests que nadie importa; y le FALTABAN yt-dlp y
+#  google-auth-oauthlib que sí se usan)
+# ============================================================
+
+# Google Calendar (OAuth 2.0 + API v3)
 google-api-python-client>=2.100.0
-spotipy>=2.23.0
+google-auth-oauthlib>=1.0.0
+
+# SSL con certificados nativos de Windows (evita errores de verificación)
+truststore>=0.9.0
+
+# Variables de entorno (.env: GROQ_API_KEY, VIKUNJA_TOKEN...)
 python-dotenv>=1.0.0
-pydub>=0.25.1
-requests>=2.31.0
-redis>=5.0.0
+
+# Motor de audio: extracción de streams de YouTube
+yt-dlp>=2024.8.6
+
+# Voz neuronal gratuita (Microsoft Edge TTS, sin API key)
+edge-tts>=7.0.0

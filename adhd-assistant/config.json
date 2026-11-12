@@ -1,21 +1,16 @@
 {
-  "apis": {
-    "groq": {
-      "modelo": "llama3-8b-8192",
-      "usar_para": ["respuesta_rapida", "charla", "clasificacion_intencion"]
-    },
-    "gemini": {
-      "modelo": "gemini-1.5-flash",
-      "usar_para": ["calendario", "musica", "planificacion", "contexto_largo"]
-    }
+  "version": "0.12.0",
+  "voz": {
+    "perfil_activo": "dalia_natural",
+    "nota": "Perfiles: dalia_tierna, camila_dulce, salome_energica, jorge_jovial, dalia_natural, elvira_zen"
   },
-  "acciones": {
-    "crear_evento": "calendar.create_event",
-    "reproducir_musica": "music.play_track"
-  },
-  "asistente_tdaah": {
+  "asistente": {
     "idioma": "es",
     "modo": "escuchar_primero",
     "respuestas_cortas": true
+  },
+  "memoria": {
+    "max_notas": 200,
+    "max_interacciones": 300
   }
 }

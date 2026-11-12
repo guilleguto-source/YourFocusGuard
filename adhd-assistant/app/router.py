@@ -4,7 +4,10 @@ import json
 import logging
 import urllib.request
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+
+import herramientas
+import memoria
 
 logger = logging.getLogger(__name__)
 
@@ -72,16 +75,47 @@ class Router:
                 continue
         return ""
 
+    # ------------------------------------------------------------------
+    # RUTEO
+    # ------------------------------------------------------------------
     def route(self, text: str) -> Dict[str, Any]:
-        """Enruta la orden hacia la acción correspondiente con parámetros parseados."""
+        """Enruta la orden hacia la acción correspondiente con parámetros parseados.
+
+        Dos capas:
+        1. Reglas rápidas locales (0 ms, sin API): frases típicas TDAH.
+        2. Clasificación LLM (Groq) con el prompt generado desde el registro
+           de herramientas + el contexto reciente de la memoria (v0.11).
+        """
         texto_lower = text.lower().strip()
         now = datetime.now()
         fecha_ref = now.strftime("%Y-%m-%d %H:%M (Día: %A)")
 
-        # 1. Reglas Rápidas (0 ms)
+        # ----------------- 1. Reglas Rápidas (0 ms) -----------------
+
+        # Briefing diario (v0.11)
+        if any(
+            w in texto_lower
+            for w in ["resumen del dia", "resumen del día", "briefing", "como va mi dia", "cómo va mi día", "cómo va mi día hoy", "repaso del dia", "repaso del día"]
+        ):
+            return {"action": "briefing_diario"}
+
+        # Buscar en notas (v0.11)
+        if any(
+            w in texto_lower
+            for w in ["busca en mis notas", "buscar en mis notas", "qué anoté", "que anote", "que anoté", "qué anoté de", "mira en mis notas"]
+        ):
+            query = text
+            for pref in ["busca en mis notas", "buscar en mis notas", "mira en mis notas", "qué anoté de", "que anoté de", "qué anoté", "que anoté", "que anote", "qué anoté sobre", "que anoté sobre"]:
+                if texto_lower.startswith(pref):
+                    query = text[len(pref):].strip(" :¿?de")
+                    break
+            if not query:
+                query = text
+            return {"action": "nota_buscar", "query": query}
+
         # Tareas: Listar
         if any(w in texto_lower for w in ["que me toca", "qué me toca", "que me falta", "qué me falta", "mis pendientes", "mis tareas", "listar tareas", "cronograma", "organizar mis prioridades", "prioridades"]):
-            return {"action": "tarea_listar", "text": text}
+            return {"action": "tarea_listar"}
 
         # Tareas: Completar
         if any(texto_lower.startswith(w) for w in ["ya termine", "ya terminé", "termine", "terminé", "completar tarea", "tarea lista", "marcar terminada", "listo el", "lista la"]):
@@ -123,8 +157,11 @@ class Router:
             }
 
         # Música / Audio
-        if any(w in texto_lower for w in ["pon musica", "pon música", "musica", "música", "reproduce", "ruido marron", "ruido marrón", "ruido blanco", "para la musica", "para la música", "stop audio"]):
-            if any(w in texto_lower for w in ["para", "stop", "deten", "detén", "silencio"]):
+        if any(w in texto_lower for w in ["pon musica", "pon música", "musica", "música", "reproduce", "ruido marron", "ruido marrón", "ruido blanco", "ruido rosa", "ruido pink", "ruido cafe", "ruido café", "para la musica", "para la música", "stop audio"]):
+            # FIX v0.12 (bug latente desde v0.9): el stop se detectaba con el
+            # substring "para", así que "ruido rosa PARA leer" detenía el audio
+            # en vez de activarlo. Ahora solo frases de parada reales.
+            if any(w in texto_lower for w in ["para la musica", "para la música", "parar", "stop", "deten", "detén", "silencio", "apaga"]):
                 return {"action": "audio_stop"}
             if "marron" in texto_lower or "marrón" in texto_lower:
                 return {"action": "audio_noise", "noise_type": "brown"}
@@ -141,23 +178,41 @@ class Router:
                     break
             return {"action": "audio_youtube", "query": query_music or "lofi beats for focus"}
 
-        # 2. Clasificación Inteligente LLM para Calendario vs Nueva Tarea vs Charla
-        prompt = f"""Eres el cerebro de un Asistente TDAH.
-REFERENCIA: {fecha_ref}, GMT-5.
+        # Offline: "anota/apunta que..." sin API key -> nota directa (v0.11)
+        if not self.groq_api_key and any(texto_lower.startswith(p) for p in ["anota", "apunta", "anotar que", "registra que"]):
+            texto_nota = re.sub(r"^(anota|apunta|anotar que|registra que)\s*(que\s*)?", "", text, flags=re.IGNORECASE).strip()
+            if texto_nota:
+                return {"action": "nota_crear", "texto": texto_nota}
 
-Frase del usuario: "{text}"
+        # -------- 2. Clasificación Inteligente LLM --------
+        # v0.12: las categorías salen del registro de herramientas
+        # (herramientas.py), y el prompt incluye la memoria reciente (v0.11)
+        # para que "y el viernes?" o "recuérdame lo de ayer" tengan contexto.
+
+        definiciones = herramientas.definiciones_para_llm()
+        contexto = memoria.contexto_reciente_texto(6)
+        bloque_contexto = (
+            f"CONTEXTO RECIENTE del usuario (lo que pidió hace un rato):\n{contexto}\n\n"
+            if contexto else ""
+        )
+
+        prompt = f"""Eres el cerebro de un Asistente TDAH.
+REFERENCIA: {fecha_ref}.
+
+{bloque_contexto}Frase del usuario: "{text}"
 
 Clasifica la acción en UNA de las siguientes categorías JSON:
-1. Si pide agendar una cita/evento con día u hora específica (ej: "cita mañana a las 10am"):
-{{"action": "crear_evento", "summary": "...", "start_time": "ISO 8601 con -05:00", "end_time": null}}
-2. Si pide anotar un trabajo, pendiente o tarea para hacer (ej: "tengo que entregar el reporte", "nueva tarea comprar pan"):
-{{"action": "tarea_crear", "title": "...", "priority": 1 a 4 (3=alta, 2=normal)}}
-3. Si es conversación o apoyo de ánimo:
-{{"action": "charla", "response": "Respuesta breve y motivadora en 1-2 frases"}}
+{definiciones}
+
+Reglas:
+- Fechas ("start_time", "due_date") en ISO 8601 con offset -05:00 (ej: {now.year}-11-13T10:00:00-05:00). Si no hay fecha clara, null.
+- "priority": 1 a 4 (3=alta, 2=normal). "end_time" puede ser null.
+- Importante: tarea_crear es un PENDIENTE por hacer; nota_crear es INFORMACIÓN para recordar (códigos, ideas, datos); crear_evento tiene día/hora de cita.
+- Para "charla": "response" breve, cálida y motivadora en 1-2 frases.
 
 Responde SOLO el bloque JSON sin comentarios."""
 
-        raw_resp = self._call_groq_llm(prompt, temperature=0.1, max_tokens=200)
+        raw_resp = self._call_groq_llm(prompt, temperature=0.1, max_tokens=220)
         clean = raw_resp
         if "```json" in clean:
             clean = clean.split("```json")[1].split("```")[0].strip()
@@ -166,6 +221,15 @@ Responde SOLO el bloque JSON sin comentarios."""
 
         try:
             parsed = json.loads(clean)
+            # Sanidad: la acción debe existir en el registro (v0.12)
+            if parsed.get("action") not in herramientas.nombres():
+                return {"action": "charla", "response": "¡Aquí estoy contigo! ¿En qué nos enfocamos hoy?"}
             return parsed
         except Exception:
+            # Sin LLM o respuesta inválida: fallback útil
+            if not self.groq_api_key:
+                return {
+                    "action": "charla",
+                    "response": "No tengo clave de Groq configurada (.env), así que solo entiendo órdenes rápidas: tareas, alarmas, música, ruido, notas y resumen del día.",
+                }
             return {"action": "charla", "response": "¡Aquí estoy contigo! ¿En qué nos enfocamos hoy?"}

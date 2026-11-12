@@ -1,5 +1,7 @@
 // ==============================================================================
-// YourFocusGuard ADHD Assistant - Frontend Engine
+// FocusGuard ADHD Assistant - Frontend Engine
+// v0.12: memoria de notas + briefing diario hablado + estado del sistema
+//        + sync bidireccional con Google Calendar + voz neuronal por trozos
 // ==============================================================================
 
 const btnMic = document.getElementById('btnMic');
@@ -13,6 +15,7 @@ const btnAddTask = document.getElementById('btnAddTask');
 const newTaskInput = document.getElementById('newTaskInput');
 const newTaskPriority = document.getElementById('newTaskPriority');
 const btnRefreshTasks = document.getElementById('btnRefreshTasks');
+const btnSyncCal = document.getElementById('btnSyncCal');
 const youtubeForm = document.getElementById('youtubeForm');
 const ytQuery = document.getElementById('ytQuery');
 const playerTitle = document.getElementById('playerTitle');
@@ -23,6 +26,27 @@ const audioStream = document.getElementById('audioStream');
 const timersList = document.getElementById('timersList');
 const toastContainer = document.getElementById('toastContainer');
 
+// v0.11: Memoria / Notas
+const notaInput = document.getElementById('notaInput');
+const btnGuardarNota = document.getElementById('btnGuardarNota');
+const notaBuscarInput = document.getElementById('notaBuscarInput');
+const notasList = document.getElementById('notasList');
+const btnRefreshNotas = document.getElementById('btnRefreshNotas');
+
+// v0.11: Briefing
+const btnBriefing = document.getElementById('btnBriefing');
+const briefingModal = document.getElementById('briefingModal');
+const briefingTexto = document.getElementById('briefingTexto');
+const btnCerrarBriefing = document.getElementById('btnCerrarBriefing');
+const btnCerrarBriefing2 = document.getElementById('btnCerrarBriefing2');
+const btnEscucharBriefing = document.getElementById('btnEscucharBriefing');
+
+// v0.12: Salud del sistema
+const saludList = document.getElementById('saludList');
+const saludUptime = document.getElementById('saludUptime');
+const btnSaludTop = document.getElementById('btnSaludTop');
+const versionTag = document.getElementById('versionTag');
+
 // --- Global Audio & Recording State ---
 let isRecording = false;
 let audioContext = null;
@@ -32,6 +56,7 @@ let animationFrameId = null;
 let recognition = null;
 let recordStartTime = 0;
 let timerInterval = null;
+let ultimoBriefing = '';
 
 // Brown / White Noise Web Audio Node
 let noiseNode = null;
@@ -44,8 +69,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initSpeechRecognition();
   loadTasks();
   loadTimers();
+  loadNotas();
+  loadSalud();
   setupNoisePresets();
   drawIdleWave();
+  // Vigilancia de alarmas vencidas (anuncio con voz + beep cada 5s)
+  setInterval(checkFinishedTimers, 5000);
+  // Refrescar diagnóstico del sistema cada 60s
+  setInterval(loadSalud, 60000);
 });
 
 // --- Tactile Ripple Effects ---
@@ -98,6 +129,7 @@ function initSpeechRecognition() {
 
     recognition.onerror = (event) => {
       console.warn('Speech recognition error:', event.error);
+      showToast('No te escuché bien. Intenta de nuevo o escribe tu orden.', 'error');
       stopRecording();
     };
   }
@@ -192,7 +224,6 @@ function drawLiveWave() {
   const bufferLength = analyser.frequencyBinCount;
   const dataArray = new Uint8Array(bufferLength);
   analyser.getByteTimeDomainData(dataArray);
-
   canvasCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
   canvasCtx.lineWidth = 2.5;
   canvasCtx.strokeStyle = '#f43f5e';
@@ -269,12 +300,17 @@ async function processMessage(text) {
     statusIndicator.textContent = `✅ ${data.message || 'Acción completada'}`;
     showToast(data.message || 'Comando ejecutado con éxito');
 
-    // Reproducir respuesta por voz si el navegador lo soporta
+    // Reproducir respuesta por voz neuronal (edge-tts en el servidor)
     speakResponse(data.message);
 
     // Actualizar secciones según la acción
     if (data.action && data.action.startsWith('tarea')) loadTasks();
     if (data.action === 'crear_alarma') loadTimers();
+    if (data.action === 'nota_crear' || data.action === 'nota_buscar') loadNotas();
+    if (data.action === 'briefing_diario') {
+      mostrarBriefing(data.message || '');
+      ultimoBriefing = data.message || '';
+    }
     if (data.action === 'audio_youtube') handleYoutubePlayback(data);
     if (data.action === 'audio_noise') startNoise(data.noise_type);
     if (data.action === 'audio_stop') stopAllAudio();
@@ -286,14 +322,107 @@ async function processMessage(text) {
   }
 }
 
-// TTS por voz del navegador
-function speakResponse(text) {
-  if (!text || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'es-ES';
-  utterance.rate = 1.05;
-  window.speechSynthesis.speak(utterance);
+// --- Voz neuronal (edge-tts vía servidor) con fallback al navegador ---
+// v0.12: divide textos largos (briefing) en trozos de ~450 caracteres y
+// los reproduce en orden, para no pasarse del límite del endpoint.
+async function speakResponse(text) {
+  if (!text) return;
+
+  const trozos = dividirTexto(text, 450);
+
+  for (const trozo of trozos) {
+    const ok = await hablarTrozo(trozo);
+    if (ok) continue;
+    // Fallback: la voz del navegador (menos natural, pero siempre funciona)
+    return hablarNavegador(trozos.join(' '));
+  }
+}
+
+async function hablarTrozo(texto) {
+  try {
+    const resp = await fetch('/api/tts?text=' + encodeURIComponent(texto));
+    if (!resp.ok) return false;
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    return await new Promise((resolve) => {
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); resolve(true); };
+      audio.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
+      audio.play().catch(() => resolve(false));
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+function hablarNavegador(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.05;
+    window.speechSynthesis.speak(utterance);
+    return true;
+  }
+  return false;
+}
+
+function dividirTexto(texto, maxLen) {
+  if (!texto) return [];
+  if (texto.length <= maxLen) return [texto];
+
+  // Cortar por frases (., !, ?) sin pasarse del máximo
+  const frases = texto.match(/[^.!?]+[.!?]*/g) || [texto];
+  const trozos = [];
+  let actual = '';
+  for (const f of frases) {
+    if ((actual + f).length > maxLen && actual) {
+      trozos.push(actual.trim());
+      actual = '';
+    }
+    actual += f;
+  }
+  if (actual.trim()) trozos.push(actual.trim());
+  return trozos.length ? trozos : [texto];
+}
+
+// --- Alarmas: vigilancia y anuncio audible aunque la consola esté cerrada ---
+async function checkFinishedTimers() {
+  try {
+    const resp = await fetch('/api/timers/announce');
+    if (!resp.ok) return;
+    const vencidas = await resp.json();
+    for (const t of vencidas) {
+      showToast(`⏰ ¡Alarma! ${t.label}`);
+      playAlarmBeep();
+      // v0.10: el servidor manda el mensaje con fecha completa listo para hablar
+      speakResponse(t.mensaje_hablado || `¡Se acabó el tiempo! ${t.label}`);
+      loadTimers();
+    }
+  } catch (e) { /* servidor no disponible */ }
+}
+
+function playAlarmBeep() {
+  try {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioContext.state === 'suspended') audioContext.resume();
+
+    [0, 350, 700].forEach(delay => {
+      setTimeout(() => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.4, audioContext.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.32);
+      }, delay);
+    });
+  } catch (e) {}
 }
 
 // --- Tasks Management (Dual Sync) ---
@@ -341,7 +470,8 @@ btnAddTask.addEventListener('click', async () => {
       body: JSON.stringify({ title, priority })
     });
     const res = await resp.json();
-    showToast(`Tarea guardada en Google & Vikunja`);
+    showToast(res.message || `Tarea guardada en Google & Vikunja`);
+    speakResponse(res.message || 'Tarea guardada. ¡Vamos con todo!');
     loadTasks();
   } catch (e) {
     showToast('Error añadiendo tarea', 'error');
@@ -353,6 +483,22 @@ btnRefreshTasks.addEventListener('click', () => {
   showToast('Tareas actualizadas');
 });
 
+// v0.10: sincronización bidireccional tareas <-> Google Calendar
+btnSyncCal.addEventListener('click', async () => {
+  btnSyncCal.textContent = '⏳';
+  try {
+    const resp = await fetch('/api/sync/calendario', { method: 'POST' });
+    const res = await resp.json();
+    showToast(res.message || 'Sincronización lista');
+    speakResponse(res.message || 'Sincronización lista');
+    loadTasks();
+  } catch (e) {
+    showToast('Error sincronizando con Google Calendar', 'error');
+  } finally {
+    btnSyncCal.textContent = '🔄';
+  }
+});
+
 window.toggleTask = async function(id, title) {
   try {
     const resp = await fetch('/api/tasks/complete', {
@@ -362,11 +508,164 @@ window.toggleTask = async function(id, title) {
     });
     const res = await resp.json();
     showToast(res.message || 'Tarea completada');
+    speakResponse(res.message || '¡Excelente! Marqué la tarea como completada.');
     loadTasks();
   } catch (e) {
     showToast('Error al completar tarea', 'error');
   }
 };
+
+// --- v0.11: Memoria / Notas rápidas ---
+async function loadNotas() {
+  const consulta = notaBuscarInput.value.trim();
+  try {
+    const url = consulta ? '/api/notas?q=' + encodeURIComponent(consulta) : '/api/notas';
+    const resp = await fetch(url);
+    const data = await resp.json();
+    renderNotas(data.notas || [], !!consulta);
+  } catch (e) {
+    notasList.innerHTML = '<div class="empty-state">No se pudo cargar la memoria.</div>';
+  }
+}
+
+function renderNotas(notas, esBusqueda) {
+  if (!notas || notas.length === 0) {
+    notasList.innerHTML = esBusqueda
+      ? '<div class="empty-state">Sin resultados. Prueba con otras palabras.</div>'
+      : '<div class="empty-state">Aún no tienes notas. Anota ideas, códigos o datos y búscalos cuando los necesites.</div>';
+    return;
+  }
+
+  notasList.innerHTML = notas.map(n => {
+    const fecha = (n.creado || '').replace('T', ' ').slice(0, 16);
+    return `
+      <div class="nota-item">
+        <div class="nota-texto">${escapeHtml(n.texto)}</div>
+        <div class="nota-meta">
+          <span class="nota-fecha">🕒 ${fecha}${n.fuente === 'voz' ? ' · 🎙️ por voz' : ''}</span>
+          <button class="nota-borrar" onclick="borrarNota(${n.id})" title="Eliminar nota">🗑</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+btnGuardarNota.addEventListener('click', async () => {
+  const texto = notaInput.value.trim();
+  if (!texto) return;
+  notaInput.value = '';
+  try {
+    const resp = await fetch('/api/notas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto, fuente: 'panel' })
+    });
+    const res = await resp.json();
+    showToast(res.message || 'Nota guardada');
+    speakResponse('Nota guardada en tu memoria.');
+    loadNotas();
+  } catch (e) {
+    showToast('Error guardando la nota', 'error');
+  }
+});
+
+notaInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') btnGuardarNota.click();
+});
+
+let buscarTimeout = null;
+notaBuscarInput.addEventListener('input', () => {
+  clearTimeout(buscarTimeout);
+  buscarTimeout = setTimeout(loadNotas, 350);
+});
+
+btnRefreshNotas.addEventListener('click', () => {
+  notaBuscarInput.value = '';
+  loadNotas();
+  showToast('Memoria actualizada');
+});
+
+window.borrarNota = async function(id) {
+  try {
+    const resp = await fetch('/api/notas/' + id, { method: 'DELETE' });
+    const res = await resp.json();
+    showToast(res.message || 'Nota eliminada');
+    loadNotas();
+  } catch (e) {
+    showToast('Error eliminando la nota', 'error');
+  }
+};
+
+// --- v0.11: Briefing diario ---
+btnBriefing.addEventListener('click', pedirBriefing);
+btnEscucharBriefing.addEventListener('click', () => speakResponse(ultimoBriefing));
+btnCerrarBriefing.addEventListener('click', cerrarBriefing);
+btnCerrarBriefing2.addEventListener('click', cerrarBriefing);
+briefingModal.addEventListener('click', (e) => {
+  if (e.target === briefingModal) cerrarBriefing();
+});
+
+async function pedirBriefing() {
+  try {
+    showToast('Preparando tu resumen...');
+    const resp = await fetch('/api/briefing');
+    const res = await resp.json();
+    ultimoBriefing = res.texto || '';
+    mostrarBriefing(ultimoBriefing);
+    speakResponse(ultimoBriefing);
+  } catch (e) {
+    showToast('No pude preparar el resumen', 'error');
+  }
+}
+
+function mostrarBriefing(texto) {
+  if (!texto) return;
+  briefingTexto.innerHTML = texto
+    .split(/(?<=[.!?])\s+/)
+    .map(f => `<p>${escapeHtml(f.trim())}</p>`)
+    .join('');
+  briefingModal.classList.remove('hidden');
+}
+
+function cerrarBriefing() {
+  briefingModal.classList.add('hidden');
+  window.speechSynthesis && window.speechSynthesis.cancel();
+}
+
+// --- v0.12: Estado del sistema ---
+async function loadSalud() {
+  try {
+    const resp = await fetch('/api/salud');
+    const s = await resp.json();
+
+    if (versionTag) versionTag.textContent = s.version || '?';
+    if (saludUptime) saludUptime.textContent = `En línea hace ${Math.round((s.uptime_seg || 0) / 60)} min`;
+
+    const chips = [
+      { ok: s.voz && s.voz.tts_disponible, label: `Voz: ${s.voz ? s.voz.perfil_activo : '?'}`, detalle: s.voz ? `${s.voz.audios_en_cache} en caché` : '' },
+      { ok: s.groq_configurado, label: 'Groq (cerebro)', detalle: s.groq_configurado ? 'activo' : 'sin clave .env' },
+      { ok: s.calendario_autenticado, label: 'Google Calendar', detalle: s.calendario_autenticado ? 'conectado' : 'sin token' },
+      { ok: s.vikunja_configurado, label: 'Vikunja', detalle: s.vikunja_configurado ? 'conectado' : 'no configurado' },
+      { ok: true, label: `Tareas: ${s.tareas_pendientes || 0}`, detalle: '' },
+      { ok: true, label: `Notas: ${s.notas_guardadas || 0}`, detalle: '' },
+      { ok: true, label: `Herramientas MCP: ${s.herramientas || 0}`, detalle: '' }
+    ];
+
+    saludList.innerHTML = chips.map(c => `
+      <div class="salud-chip ${c.ok ? 'ok' : 'warn'}">
+        <span class="salud-dot">${c.ok ? '✓' : '!'}</span>
+        <span class="salud-label">${escapeHtml(c.label)}${c.detalle ? ` <small>· ${escapeHtml(c.detalle)}</small>` : ''}</span>
+      </div>
+    `).join('');
+  } catch (e) {
+    if (saludList) saludList.innerHTML = '<div class="empty-state">Sin diagnóstico (¿servidor activo?).</div>';
+  }
+}
+
+btnSaludTop.addEventListener('click', () => {
+  loadSalud();
+  document.querySelector('.salud-card').scrollIntoView({ behavior: 'smooth' });
+});
 
 // --- Timers Management ---
 async function loadTimers() {
@@ -379,7 +678,7 @@ async function loadTimers() {
       timersList.innerHTML = timers.map(t => `
         <div class="timer-item">
           <span>🔔 ${escapeHtml(t.label)}</span>
-          <span class="timer-time">${t.target_time}</span>
+          <span class="timer-time" title="${escapeHtml(t.target_fecha || '')}">${t.target_time}${t.target_fecha ? ' 📅' : ''}</span>
         </div>
       `).join('');
     }
