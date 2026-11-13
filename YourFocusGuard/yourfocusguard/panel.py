@@ -397,19 +397,6 @@ def construir_overlay(payload: dict) -> dict:
         if seccion:
             overlay["mascota"] = seccion
 
-    if "mascota" in payload:
-        ma = payload["mascota"] or {}
-        seccion = {}
-        if "visible" in ma:
-            seccion["visible"] = bool(ma["visible"])
-        if "tema" in ma:
-            tema = str(ma["tema"])
-            if tema not in TEMAS_MASCOTA:
-                raise ValueError(f"tema inválido: {tema!r}")
-            seccion["tema"] = tema
-        if seccion:
-            overlay["mascota"] = seccion
-
     if "concentracion" in payload:
         cc = payload["concentracion"] or {}
         seccion = {}
@@ -673,17 +660,18 @@ class PanelServidor:
                     if origin not in origenes_validos:
                         self._responder(403, {"ok": False, "error": "Origin no permitido"})
                         return
-                if self.path == "/api/config":
+                ruta_limpia = urllib.parse.urlparse(self.path).path
+                if ruta_limpia == "/api/config":
                     self._api_config()
-                elif self.path == "/api/control":
+                elif ruta_limpia == "/api/control":
                     self._api_control()
-                elif self.path == "/api/detectar":
+                elif ruta_limpia == "/api/detectar":
                     self._api_detectar()
-                elif self.path == "/api/pet/say":
+                elif ruta_limpia == "/api/pet/say":
                     self._api_pet_say()
-                elif self.path == "/api/pet/set-pet":
+                elif ruta_limpia == "/api/pet/set-pet":
                     self._api_pet_set_pet()
-                elif self.path == "/api/pet/responder":
+                elif ruta_limpia == "/api/pet/responder":
                     self._api_pet_responder()
                 else:
                     self.send_error(404)
@@ -769,6 +757,14 @@ class PanelServidor:
                     self._responder(400, {"ok": False, "error": str(exc)[:200]})
                     return
                 cmd = str(datos.get("cmd", ""))
+                if cmd == "start_voice":
+                    try:
+                        from yourfocusguard.actions.groq_voice import hablar_con_mascota_async
+                        hablar_con_mascota_async()
+                    except Exception as exc:
+                        log.warning("Fallo al iniciar escucha por voz: %s", exc)
+                    self._responder(200, {"ok": True, "cmd": "start_voice"})
+                    return
                 permitidos = {
                     "pause", "pause_manual", "resume", "resume_or_extend",
                     "stop", "task", "test_alert",

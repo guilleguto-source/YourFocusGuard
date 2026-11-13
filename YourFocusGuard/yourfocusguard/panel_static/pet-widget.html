@@ -38,10 +38,10 @@
     /* Burbuja de diálogo autoajustable sin scroll */
     .bubble {
       position: relative;
-      width: 94%;
-      max-width: 195px;
+      width: 96%;
+      max-width: 215px;
       margin-bottom: 6px;
-      padding: 6px 9px;
+      padding: 5px 6px;
       background: var(--bubble-bg);
       border: 1.5px solid var(--bubble-border);
       border-radius: 12px;
@@ -85,20 +85,25 @@
     }
     .bubble-opciones {
       display: flex;
-      gap: 4px;
+      gap: 3px;
       justify-content: center;
       margin-top: 4px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      width: 100%;
     }
     .bubble-btn {
-      background: #EFECE6;
+      background: #FDFBF7;
       border: 1px solid #D8D2C4;
       border-radius: 5px;
-      padding: 2px 6px;
-      font-size: 9px;
+      padding: 2px 4px;
+      font-size: 8px;
       font-weight: 600;
       color: #2F2B25;
       cursor: pointer;
+      white-space: nowrap;
+      flex: 1 1 0;
+      min-width: 0;
+      text-align: center;
       transition: background 120ms;
     }
     .bubble-btn:hover {
@@ -329,7 +334,12 @@
             const btn = document.createElement("button");
             btn.className = "bubble-btn";
             btn.id = `bubble-opc-${idx}`;
-            const icono = (idx === 0) ? "✅ " : (idx === 1 ? "❌ " : (idx === 2 ? "📖 " : ""));
+            let icono = "";
+            if (opsParsed.length === 2) {
+              icono = (idx === 0) ? "✅ " : "❌ ";
+            } else {
+              icono = (idx === 0) ? "✅ " : (idx === 1 ? "⏸ " : "📖 ");
+            }
             btn.textContent = (idx === 0 && segRestantes > 0) ? `${icono}${item.etiqueta} (${segRestantes}s)` : `${icono}${item.etiqueta}`;
             btn.onclick = (e) => {
               e.stopPropagation();

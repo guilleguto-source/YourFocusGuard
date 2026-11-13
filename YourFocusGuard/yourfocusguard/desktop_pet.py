@@ -48,6 +48,15 @@ def lanzar_mascota_escritorio(
 
 
 if __name__ == "__main__":
-    puerto = int(sys.argv[1]) if len(sys.argv) > 1 else 8756
-    mascota = sys.argv[2] if len(sys.argv) > 2 else "null-wisp"
+    arg1 = sys.argv[1] if len(sys.argv) > 1 else ""
+    arg2 = sys.argv[2] if len(sys.argv) > 2 else ""
+    if arg1.isdigit():
+        puerto = int(arg1)
+        mascota = arg2 or "null-wisp"
+    elif arg2.isdigit():
+        mascota = arg1 or "null-wisp"
+        puerto = int(arg2)
+    else:
+        mascota = arg1 or "null-wisp"
+        puerto = 8756
     lanzar_mascota_escritorio(puerto, mascota)

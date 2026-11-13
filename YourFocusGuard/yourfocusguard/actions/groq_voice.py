@@ -640,7 +640,24 @@ def hablar_con_mascota_async(segundos: float = 8.0, modo_privado: bool = False) 
                 tts.speak(respuesta)
 
                 def _auto_ejecutar():
-                    time.sleep(15)
+                    cancelado = False
+                    for _ in range(30):
+                        time.sleep(0.5)
+                        try:
+                            from yourfocusguard.panel import pet_consumir_respuestas
+                            respuestas = [str(r).strip().lower() for r in pet_consumir_respuestas()]
+                            if any(r in ("cancelar", "cancel", "no") for r in respuestas):
+                                cancelado = True
+                                break
+                            if any(r in ("agendar", "confirmar", "sí", "si") for r in respuestas):
+                                break
+                        except Exception:
+                            pass
+
+                    if cancelado:
+                        publish(EVT_PET_SAY, {"texto": "Cancelado. No agendé nada.", "reaccion": "idle", "duracion_ms": 3000})
+                        return
+
                     try:
                         from yourfocusguard.config import load_config
                         cfg = load_config()
