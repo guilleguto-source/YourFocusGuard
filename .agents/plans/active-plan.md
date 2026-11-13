@@ -1,23 +1,31 @@
-# Plan de Implementación: Lanzador Silencioso Independiente y Accesos Directos
+# Plan de Corrección: Botones Dinámicos (+5m), Micrófono Compacto y Solución 404
 
 ## Contexto Digerido
-- El usuario solicita detener los procesos actuales dentro de Antigravity.
-- Desea que ambos servicios (`adhd-assistant` en :8765 y `YourFocusGuard` con la mascota en :8756) funcionen de forma independiente de Antigravity.
-- Cero ventanas de consola visibles (modo totalmente silencioso con `pythonw` y `.vbs`).
-- Accesos directos limpios y actualizados en el Escritorio (`C:\Users\Guill\Desktop`), eliminando los anteriores.
+1. **Error 404 en el Panel Web (`Error response 404`):**
+   - `panel.py` compara estrictamente `self.path == "/pet-widget.html"`. Al agregarse `?v=1.0.3` en `index.html`, no coincidió y lanzó 404.
+   - Solución: parsear con `urllib.parse.urlparse(self.path).path` para admitir query params de caché.
+2. **Botón Micrófono:**
+   - Quitar la palabra "Hablar" y dejar únicamente el icono `🎤` en un botón píldora compacto central.
+3. **Botones de Pausa y Continuar con Acumulación de +5 Minutos:**
+   - Botón izquierdo: `⏸ +5m` (suma 5 minutos por cada clic: 5m, 10m, 15m... y confirma: "Pausa de X min activa").
+   - Botón derecho: `▶ +5m` (suma 5 minutos por cada clic: +5m, +10m, +15m... y confirma: "+X min de foco añadidos").
+4. **Corte de botones y espaciado al cambiar de tamaño:**
+   - En `_cambiar_tamaño`, redibujar inmediatamente la burbuja y botones (`_mostrar_burbuja`).
+   - Fijar un ancho mínimo seguro (`ancho_win >= 210px`) para evitar que el tercer botón se corte en tamaño "pequeño".
+   - Ajustar el espaciado vertical entre botones y la mascota.
 
-## Archivos Afectados / Creados
-- `iniciar_asistente.bat` (nuevo en raíz): arranque con `pythonw.exe` de `adhd-assistant/app/server.py` y `YourFocusGuard/run.py start`.
-- `iniciar_silencioso.vbs` (nuevo en raíz): wrapper VBScript (`windowStyle=0`) para ejecutar `iniciar_asistente.bat` sin ventana de consola.
-- `detener_asistente.bat` (nuevo en raíz): terminación limpia de ambos servicios.
-- `detener_silencioso.vbs` (nuevo en raíz): wrapper VBScript silencioso para detención.
-- `C:\Users\Guill\Desktop\Iniciar Asistente TDAH.lnk`: acceso directo en el escritorio.
-- `C:\Users\Guill\Desktop\Detener Asistente TDAH.lnk`: acceso directo de parada.
+## Archivos Afectados
+- `YourFocusGuard/yourfocusguard/panel.py`: parsear `urlparse(self.path).path` en `do_GET` para eliminar el error 404 en `/pet-widget.html`.
+- `YourFocusGuard/yourfocusguard/desktop_pet_native.py`:
+  - Botones estándar: `[⏸ +5m]` (acumulativo), `[🎤]` (solo icono), `[▶ +5m]` (acumulativo).
+  - Confirmación inmediata en burbuja con los minutos totales acumulados.
+  - Redibujado automático en `_cambiar_tamaño` con ancho mínimo seguro contra recortes.
+- `YourFocusGuard/yourfocusguard/panel_static/pet-widget.html`: reflejar los mismos botones `[⏸ +5m]`, `[🎤]`, `[▶ +5m]` acumulativos.
 
 ## Checklist de Despliegue
-- [ ] Detener procesos activos en Antigravity (`task-868` y `task-1052`).
-- [ ] Crear scripts de inicio silencioso unificado (`.bat` y `.vbs`).
-- [ ] Crear scripts de detención silenciosa unificada (`.bat` y `.vbs`).
-- [ ] Eliminar accesos directos obsoletos en `C:\Users\Guill\Desktop`.
-- [ ] Crear nuevos accesos directos en el Escritorio apuntando a los lanzadores silenciosos.
-- [ ] Ejecutar el lanzador silencioso para verificar arranque independiente y ausencia de consolas.
+- [x] Modificar `panel.py` para normalizar rutas estáticas sin query params (resuelve 404).
+- [x] Modificar `desktop_pet_native.py` con botones acumulativos (+5m), micro solo `🎤` y redraw al redimensionar.
+- [x] Modificar `pet-widget.html` con la misma lógica de botones y acumulación de +5m.
+- [x] Reiniciar procesos silenciosos para validar visualmente.
+- [x] Ejecutar suites de pruebas (281/281 OK).
+- [x] Git commit y push.

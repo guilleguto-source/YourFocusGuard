@@ -20,6 +20,7 @@ import json
 import logging
 import threading
 import time
+import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -588,21 +589,23 @@ class PanelServidor:
                 self.wfile.write(cuerpo)
 
             def do_GET(self) -> None:  # noqa: N802 (nombre de http.server)
-                if self.path in ("/", "/index.html"):
+                parsed = urllib.parse.urlparse(self.path)
+                ruta_limpia = parsed.path
+                if ruta_limpia in ("/", "/index.html"):
                     self._archivo(
                         "index.html", "text/html; charset=utf-8"
                     )
-                elif self.path == "/estilos.css":
+                elif ruta_limpia == "/estilos.css":
                     self._archivo("estilos.css", "text/css; charset=utf-8")
-                elif self.path == "/aplicacion.js":
+                elif ruta_limpia == "/aplicacion.js":
                     self._archivo(
                         "aplicacion.js", "application/javascript; charset=utf-8"
                     )
-                elif self.path == "/pet-widget.html":
+                elif ruta_limpia == "/pet-widget.html":
                     self._archivo("pet-widget.html", "text/html; charset=utf-8")
-                elif self.path.startswith("/pets/"):
+                elif ruta_limpia.startswith("/pets/"):
                     # Servir assets de mascotas (spritesheet.webp, pet.json)
-                    partes = [p for p in self.path.split("/") if p]
+                    partes = [p for p in ruta_limpia.split("/") if p]
                     if len(partes) >= 2:
                         sub = Path(*partes[1:])
                         pets_dir = (STATIC_DIR / "pets").resolve()
@@ -634,17 +637,17 @@ class PanelServidor:
                             except OSError:
                                 pass
                     self.send_error(404)
-                elif self.path == "/api/pet/state":
+                elif ruta_limpia == "/api/pet/state":
                     self._responder(200, pet_estado_actual())
-                elif self.path == "/api/pet/list":
+                elif ruta_limpia == "/api/pet/list":
                     self._responder(200, {"ok": True, "pets": pet_listar_disponibles()})
 
-                elif self.path == "/favicon.ico":
+                elif ruta_limpia == "/favicon.ico":
                     self.send_response(204)
                     self.end_headers()
-                elif self.path.startswith("/api/reporte/semanal"):
+                elif ruta_limpia.startswith("/api/reporte/semanal"):
                     self._responder(200, payload_reporte_semanal(panel.cfg))
-                elif self.path == "/api/estado":
+                elif ruta_limpia == "/api/estado":
                     cuerpo = json.dumps(
                         payload_estado(panel.cfg), ensure_ascii=False
                     ).encode("utf-8")

@@ -79,6 +79,9 @@ class MascotaFlotanteNativa:
         self._ultimas_opciones: list[str] = []
         self._opciones_activas: list[str] = []
         self._countdown_seg = 0
+        self._pausa_acumulada_min = 0
+        self._foco_acumulado_min = 0
+        self._timer_reset_acum_id = None
 
         # Ventana Tkinter
         self.root = tk.Tk()
@@ -130,9 +133,10 @@ class MascotaFlotanteNativa:
 
     def _ajustar_dimensiones_ventana(self) -> None:
         escala = TAMAÑOS_ESCALA.get(self.tamaño, 0.55)
-        self.ancho_win = int(240 * (escala / 0.55))
-        self.alto_pet = int(140 * (escala / 0.55))
-        self.alto_burbuja = 74
+        # Ancho mínimo de 220px para que los 3 botones encajen con margen en cualquier escala
+        self.ancho_win = max(220, int(240 * (escala / 0.55)))
+        self.alto_pet = int(120 * (escala / 0.55))
+        self.alto_burbuja = 32
         self.alto_win = self.alto_burbuja + self.alto_pet
 
         import ctypes, ctypes.wintypes
@@ -276,6 +280,8 @@ class MascotaFlotanteNativa:
             self.canvas_pet.config(width=self.ancho_win, height=self.alto_pet)
             self.canvas_pet.coords(self.sprite_item, self.ancho_win // 2, self.alto_pet // 2)
             self._actualizar_frames()
+            self.root.geometry(f"{self.ancho_win}x{self.alto_win}+{self.root.winfo_x()}+{self.root.winfo_y()}")
+            self._mostrar_burbuja(self._ultimo_texto_burbuja, self._opciones_activas)
 
     def _seleccionar_mascota(self, nuevo_id: str) -> None:
         self._cargar_mascota(nuevo_id)
@@ -439,28 +445,29 @@ class MascotaFlotanteNativa:
                 self._timer_countdown_id = self.root.after(1000, self._tick_countdown)
 
         else:
-            # Modo Estándar de 3 botones (10m / Hablar / +15m)
-            btn_w = (self.ancho_win - 26) // 3
-            bx0 = 5
+            # Modo Estándar de 3 botones ([⏸ +5m] [🎤] [▶ +5m])
+            mid_w = 38
+            btn_w = (self.ancho_win - mid_w - 24) // 2
+            bx0 = 6
             bx1 = bx0 + btn_w
             _crear_boton(
-                "btn_pause10", bx0, bx1, "10m", "⏸", "#B45309",
+                "btn_pause", bx0, bx1, "+5m", "⏸", "#B45309",
                 "#FDFBF7", "#D8D2C4", "#F5EFE6", "#B45309",
-                lambda: self._enviar_control({"cmd": "pause_manual", "minutos": 10, "espera_confirmacion": True})
+                lambda: self._sumar_pausa()
             )
             cx0 = bx1 + 6
-            cx1 = cx0 + btn_w
+            cx1 = cx0 + mid_w
             _crear_boton(
-                "btn_hablar", cx0, cx1, "Hablar", "🎤", "#2F2B25",
+                "btn_hablar", cx0, cx1, "", "🎤", "#2F2B25",
                 "#F5F3EF", "#D1CABE", "#EAE5DC", "#5D584C",
                 lambda: self._hablar_con_mascota()
             )
             dx0 = cx1 + 6
-            dx1 = self.ancho_win - 5
+            dx1 = self.ancho_win - 6
             _crear_boton(
-                "btn_cont15", dx0, dx1, "+15m", "▶", "#4D6B53",
+                "btn_cont", dx0, dx1, "+5m", "▶", "#4D6B53",
                 "#FDFBF7", "#D8D2C4", "#E9EFE7", "#4D6B53",
-                lambda: self._enviar_control({"cmd": "resume_or_extend", "minutos": 15})
+                lambda: self._sumar_foco()
             )
 
         # 3. Ajuste dinámico de ventana según el tamaño del contenido
@@ -472,6 +479,38 @@ class MascotaFlotanteNativa:
             cur_y = self.root.winfo_y()
             self.root.geometry(f"{self.ancho_win}x{self.alto_win}+{cur_x}+{cur_y}")
             self.canvas_burbuja.config(height=self.alto_burbuja)
+
+    def _reset_acumulaciones(self) -> None:
+        self._pausa_acumulada_min = 0
+        self._foco_acumulado_min = 0
+
+    def _sumar_pausa(self) -> None:
+        self._pausa_acumulada_min += 5
+        minutos = self._pausa_acumulada_min
+        self._foco_acumulado_min = 0
+        if self._timer_reset_acum_id:
+            try:
+                self.root.after_cancel(self._timer_reset_acum_id)
+            except Exception:
+                pass
+        self._timer_reset_acum_id = self.root.after(15000, self._reset_acumulaciones)
+        self._enviar_control({"cmd": "pause_manual", "minutos": minutos, "espera_confirmacion": True})
+        msg = f"⏸ Pausa de {minutos} min activa" if minutos == 5 else f"⏸ Pausa extendida a {minutos} min"
+        self._mostrar_burbuja(msg)
+
+    def _sumar_foco(self) -> None:
+        self._foco_acumulado_min += 5
+        minutos = self._foco_acumulado_min
+        self._pausa_acumulada_min = 0
+        if self._timer_reset_acum_id:
+            try:
+                self.root.after_cancel(self._timer_reset_acum_id)
+            except Exception:
+                pass
+        self._timer_reset_acum_id = self.root.after(15000, self._reset_acumulaciones)
+        self._enviar_control({"cmd": "resume_or_extend", "minutos": minutos})
+        msg = f"▶ +{minutos} min de foco añadidos"
+        self._mostrar_burbuja(msg)
 
     def _tick_countdown(self) -> None:
         """Actualiza la cuenta regresiva de 15s en el botón de confirmación."""

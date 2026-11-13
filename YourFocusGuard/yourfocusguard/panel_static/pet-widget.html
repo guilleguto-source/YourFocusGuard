@@ -135,6 +135,10 @@
       border-color: #8C8275;
       color: #1A1815;
     }
+    .quick-mic {
+      padding: 2px 7px;
+      font-size: 10px;
+    }
     .quick-btn.active-pause {
       background: #D97706;
       color: #FFFFFF;
@@ -250,8 +254,9 @@
       <option value="einstein" selected>Einstein</option>
     </select>
     <div class="quick-actions" id="quick-actions">
-      <button type="button" class="quick-btn" id="btn-quick-pause" title="Pausa de 10 minutos (requiere confirmación para reanudar)">⏸ Pausar 10m</button>
-      <button type="button" class="quick-btn" id="btn-quick-continue" title="Continuar 15 minutos más de foco">▶ Continuar +15m</button>
+      <button type="button" class="quick-btn" id="btn-quick-pause" title="Pausa acumulativa de +5 minutos">⏸ +5m</button>
+      <button type="button" class="quick-btn quick-mic" id="btn-quick-mic" title="Hablar con el asistente">🎤</button>
+      <button type="button" class="quick-btn" id="btn-quick-continue" title="Continuar +5 minutos más de foco">▶ +5m</button>
     </div>
   </div>
 
@@ -428,31 +433,59 @@
         } catch (e) {}
       }
 
-      // Iniciar
+      // Iniciar controles rápidos acumulativos
+      let pausaAcumulada = 0;
+      let focoAcumulado = 0;
+      let resetAcumTimeout = null;
+
+      function resetAcumulaciones() {
+        pausaAcumulada = 0;
+        focoAcumulado = 0;
+      }
+
       const btnPause = document.getElementById("btn-quick-pause");
+      const btnMic = document.getElementById("btn-quick-mic");
       const btnContinue = document.getElementById("btn-quick-continue");
 
       if (btnPause) {
         btnPause.addEventListener("click", () => {
+          pausaAcumulada += 5;
+          focoAcumulado = 0;
+          if (resetAcumTimeout) clearTimeout(resetAcumTimeout);
+          resetAcumTimeout = setTimeout(resetAcumulaciones, 15000);
           fetch("/api/control", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cmd: "pause_manual", minutos: 10, espera_confirmacion: true })
-          }).then(() => {
-            mostrarBurbuja("Pausa de 10 min iniciada. Confirma con Continuar para reanudar.", ["Continuar"], 0);
+            body: JSON.stringify({ cmd: "pause_manual", minutos: pausaAcumulada, espera_confirmacion: true })
           }).catch(() => {});
+          const msg = pausaAcumulada === 5 ? `⏸ Pausa de ${pausaAcumulada} min activa` : `⏸ Pausa extendida a ${pausaAcumulada} min`;
+          mostrarBurbuja(msg, [], 4000);
+        });
+      }
+
+      if (btnMic) {
+        btnMic.addEventListener("click", () => {
+          fetch("/api/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cmd: "start_voice" })
+          }).catch(() => {});
+          mostrarBurbuja("🎤 Escuchando...", [], 3000);
         });
       }
 
       if (btnContinue) {
         btnContinue.addEventListener("click", () => {
+          focoAcumulado += 5;
+          pausaAcumulada = 0;
+          if (resetAcumTimeout) clearTimeout(resetAcumTimeout);
+          resetAcumTimeout = setTimeout(resetAcumulaciones, 15000);
           fetch("/api/control", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cmd: "resume_or_extend", minutos: 15 })
-          }).then(() => {
-            mostrarBurbuja("¡Excelente! +15 min de enfoque activados.", [], 4000);
+            body: JSON.stringify({ cmd: "resume_or_extend", minutos: focoAcumulado })
           }).catch(() => {});
+          mostrarBurbuja(`▶ +${focoAcumulado} min de foco añadidos`, [], 4000);
         });
       }
 
