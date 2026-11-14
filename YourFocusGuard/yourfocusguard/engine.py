@@ -256,6 +256,7 @@ class Agent:
         self._pausa_espera_confirmacion: bool = False
         self._ultimo_aviso_30min_ts: float | None = None
         self._foco_30min_sugerido: bool = False
+        self._ultimo_tick_ts: float | None = None
 
         # v0.8.2: suscripción a consumo de API por voz / LLM
         try:
@@ -372,11 +373,13 @@ class Agent:
 
     def _tick(self, ahora: float | None = None) -> dict:
         ahora = self.reloj() if ahora is None else ahora
+        delta_tick = 0.0 if self._ultimo_tick_ts is None else max(0.0, ahora - self._ultimo_tick_ts)
+        self._ultimo_tick_ts = ahora
         self._procesar_control(ahora)
         if self._parar:
             return {"estado": "DETENIDO"}
         self._atender_pedidos(ahora)
-        self._verificar_scheduler(ahora)
+        self._verificar_scheduler(ahora, delta_seg=delta_tick, en_foco=self._es_en_foco())
 
         # v0.7.1: modo concentración con duración — si pasó el tiempo preset,
         # se desactiva solo (salvo que sea 0 = hasta próximo reinicio).
@@ -735,12 +738,38 @@ class Agent:
             self._pedido_sigo = False
             self.confirmar_sigo(ahora)
 
-    def _verificar_scheduler(self, ahora: float) -> None:
+    def _es_en_foco(self) -> bool:
+        """Determina si el usuario está en foco activo y presente."""
+        if self._pausa_actual is not None:
+            return False
+        if self.paused_until is not None:
+            return False
+        if self.pom_fase in ("pausa", "pausa_larga"):
+            return False
+        if self.off_since is not None:
+            return False
+        if self._sesion_idle is not None:
+            umbral_idle = (
+                self.cfg.sesion.segundos_inactivo
+                if self.guardia.activa
+                else self.cfg.heuristica.idle_ausencia_seg
+            )
+            if self._sesion_idle >= umbral_idle:
+                return False
+        if self.guardia.activa:
+            if self._sesion_motivo is not None:
+                return False
+            return self.estado == Estado.FOCO
+        return self.estado == Estado.FOCO
+
+    def _verificar_scheduler(
+        self, ahora: float, delta_seg: float = 0.0, en_foco: bool = True
+    ) -> None:
         """Verifica y dispara recordatorios y rutinas en tiempo real (v0.8.3 Fase 3)."""
         try:
             from yourfocusguard.core.scheduler import obtener_scheduler
             scheduler = obtener_scheduler(self.cfg)
-            avisos = scheduler.verificar_pendientes()
+            avisos = scheduler.verificar_pendientes(delta_seg=delta_seg, en_foco=en_foco)
             for aviso in avisos:
                 self._decir(aviso, voz=True, nivel=1)
         except Exception as exc:
@@ -1423,7 +1452,17 @@ class Agent:
 
         intervalo_seg = getattr(self.cfg.alertas, "refuerzo_intervalo_min", 10) * 60
 
-        if self.estado == Estado.FOCO and self.off_since is None and self._pausa_actual is None:
+        idle_inactivo = (
+            self._sesion_idle is not None
+            and self.guardia.activa
+            and self._sesion_idle >= self.cfg.sesion.segundos_inactivo
+        )
+        if (
+            self.estado == Estado.FOCO
+            and self.off_since is None
+            and self._pausa_actual is None
+            and not idle_inactivo
+        ):
             if self._foco_continuo_desde is None:
                 self._foco_continuo_desde = ahora
                 self._ultimo_refuerzo_ts = ahora

@@ -94,7 +94,17 @@ class Scheduler:
         self._candado = threading.Lock()
         self._contador = 0
         self._ultimo_check_rutina = time.time()
+        self._segundos_foco_acumulados = 0.0
         self._ultimo_dia_ejercicio = ""
+
+    def reiniciar_foco(self) -> None:
+        """Reinicia la acumulación de foco activo."""
+        self._segundos_foco_acumulados = 0.0
+        self._ultimo_check_rutina = time.time()
+
+    @property
+    def segundos_foco_acumulados(self) -> float:
+        return self._segundos_foco_acumulados
 
     def programar(self, mensaje: str, delta_minutos: float) -> Recordatorio:
         """Registra un recordatorio a disparar en delta_minutos."""
@@ -107,7 +117,7 @@ class Scheduler:
             log.info("Recordatorio '%s' programado para dentro de %.1f min", mensaje, delta_minutos)
             return rec
 
-    def verificar_pendientes(self) -> list[str]:
+    def verificar_pendientes(self, delta_seg: float = 0.0, en_foco: bool = True) -> list[str]:
         """Comprueba y consume avisos que hayan cumplido su plazo."""
         ahora = time.time()
         avisos: list[str] = []
@@ -125,13 +135,22 @@ class Scheduler:
         # 2. Rutinas periódicas (si están habilitadas en config)
         rutinas = getattr(self.cfg, "rutinas", None)
         if rutinas and getattr(rutinas, "habilitado", True):
-            # Pausa activa por intervalo
+            # Pausa activa por intervalo (acumula foco real; no avanza si está inactivo/ausente)
             intervalo_min = getattr(rutinas, "pausa_activa_cada_min", 0)
             if intervalo_min > 0:
-                if ahora - self._ultimo_check_rutina >= (intervalo_min * 60.0):
+                if delta_seg > 0.0:
+                    delta = delta_seg
                     self._ultimo_check_rutina = ahora
-                    msg = getattr(rutinas, "pausa_activa_mensaje", "Toca pausa activa y agua.")
-                    avisos.append(f"🧘 {msg}")
+                else:
+                    delta = max(0.0, ahora - self._ultimo_check_rutina)
+                    self._ultimo_check_rutina = ahora
+
+                if en_foco:
+                    self._segundos_foco_acumulados += delta
+                    if self._segundos_foco_acumulados >= (intervalo_min * 60.0):
+                        self._segundos_foco_acumulados = 0.0
+                        msg = getattr(rutinas, "pausa_activa_mensaje", "Toca pausa activa y agua.")
+                        avisos.append(f"🧘 {msg}")
 
             # Ejercicio a hora fija diaria
             hora_fija = (getattr(rutinas, "ejercicio_hora", "") or "").strip()

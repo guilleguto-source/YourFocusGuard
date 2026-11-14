@@ -65,3 +65,22 @@ def test_scheduler_rutina_pausa_activa(cfg):
 
     avisos = scheduler.verificar_pendientes()
     assert any("Estira y toma agua" in a for a in avisos)
+
+
+def test_scheduler_pausa_activa_no_dispara_si_inactivo(cfg):
+    cfg.rutinas = RutinasCfg(
+        habilitado=True,
+        pausa_activa_cada_min=50.0,
+        pausa_activa_mensaje="Llevas 50 minutos concentrado.",
+    )
+    scheduler = Scheduler(cfg)
+    # Simular 1 hora (3600s) de ausencia/inactividad (en_foco=False)
+    avisos = scheduler.verificar_pendientes(delta_seg=3600.0, en_foco=False)
+    assert len(avisos) == 0
+    assert scheduler.segundos_foco_acumulados == 0.0
+
+    # Ahora el usuario vuelve y trabaja 50 minutos (3000s) con en_foco=True
+    avisos2 = scheduler.verificar_pendientes(delta_seg=3000.0, en_foco=True)
+    assert len(avisos2) == 1
+    assert "50 minutos concentrado" in avisos2[0]
+

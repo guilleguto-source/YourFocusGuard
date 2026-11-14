@@ -192,7 +192,9 @@ class GuardianSesion:
 
         # acumulado de tiempo "en la tarea" (para el resumen de cierre)
         if self._ultima_eval is not None and self._ultima_presencia != Presencia.FUERA:
-            self.seg_en_app += max(0.0, ahora - self._ultima_eval)
+            # Solo acumular si el usuario no estuvo inactivo (teclado/ratón sin tocar)
+            if idle_seg is None or idle_seg < self.cfg.segundos_inactivo:
+                self.seg_en_app += max(0.0, ahora - self._ultima_eval)
         self._ultima_eval = ahora
         self._ultima_presencia = presencia
 

@@ -64,6 +64,21 @@ def test_r2_inactivo_en_app_dispara(cfg):
     assert ev.sostenido_seg >= 60
 
 
+def test_seg_en_app_no_acumula_en_inactividad(cfg):
+    cfg.sesion.segundos_inactivo = 60.0
+    g = guardia(cfg)
+    g.iniciar(T0, ["photoshop"])
+    g.evaluar(T0, Presencia.EN_APP, 0.0)
+    g.evaluar(T0 + 10, Presencia.EN_APP, 5.0)  # 10s activo -> suma 10s
+    assert g.seg_en_app == 10.0
+
+    # Usuario inactivo (idle >= 60s) durante los siguientes 300s
+    g.evaluar(T0 + 310, Presencia.EN_APP, 300.0)
+    # seg_en_app NO debe haber sumado esos 300s
+    assert g.seg_en_app == 10.0
+
+
+
 def test_visible_en_otro_monitor_cuenta_como_presente(cfg):
     g = guardia(cfg)
     g.iniciar(T0, ["photoshop"])
