@@ -1,20 +1,28 @@
-# Plan: Corrección de Detección de Inactividad y Cronómetro de Foco Real
+# Plan: Empaquetado Ligero para Auditoría y Manifiesto de Arquitectura
 
-## Diagnóstico Raíz
-1. **Scheduler Ciego al Tiempo Real (`scheduler.py`)**: `verificar_pendientes()` calculaba la pausa activa mediante tiempo absoluto de reloj (`ahora - _ultimo_check_rutina >= 50m`), sin importar si el usuario estaba ausente o en pausa.
-2. **Ubicación en Tick del Motor (`engine.py`)**: `_verificar_scheduler(ahora)` se ejecutaba al inicio de cada ciclo antes de evaluar pausas, ausencias o inactividad del teclado/ratón.
-3. **Acumulación Falsa en Guardián (`session_guard.py`)**: `seg_en_app` acumulaba segundos continuamente siempre que la ventana activa fuera de trabajo (`!= FUERA`), ignorando si `idle_seg >= segundos_inactivo`.
+## Contexto
+El usuario requiere un archivo ZIP optimizado para auditoría de código del Asistente TDAH / YourFocusGuard, junto con un documento explicativo que detalle la función de la suite y especifique exhaustivamente qué elementos se excluyeron para reducir el peso de ~800 MB a < 5 MB.
 
-## Archivos Afectados
-- `YourFocusGuard/yourfocusguard/core/scheduler.py`
-- `YourFocusGuard/yourfocusguard/session_guard.py`
-- `YourFocusGuard/yourfocusguard/engine.py`
-- `YourFocusGuard/tests/test_scheduler.py`
-- `YourFocusGuard/tests/test_session_guard.py`
+## Archivos a Generar
+- `auditoria_asistente_tdah.zip` (en la raíz del workspace)
+- `EXPLICACION_SISTEMA_Y_AUDITORIA.md` (incluido en el ZIP y en la raíz)
 
-## Checklist de Implementación
-- [ ] **1. `scheduler.py`**: Cambiar el timer de pausa activa de reloj absoluto a acumulación de tiempo de foco activo (`tiempo_foco_acumulado += delta_seg`). Si no hay foco activo (inactivo/pausa/ausencia), no acumula.
-- [ ] **2. `session_guard.py`**: Condicionar el incremento de `seg_en_app` a que el usuario NO supere `segundos_inactivo` (90s). Si está congelado/idle, no suma tiempo de trabajo.
-- [ ] **3. `engine.py`**: Pasar al scheduler el estado de foco activo (`en_foco = not en_pausa and not en_ausencia and idle < umbral`) y mover/condicionar el aviso a momentos de foco genuino.
-- [ ] **4. Tests Unitarios**: Crear pruebas que verifiquen que tras 1 hora de idle/ausencia NO se dispara la pausa activa ni se infla `seg_en_app`.
-- [ ] **5. Reinicio de Servicios**: Reiniciar los procesos en segundo plano con `detener_silencioso.vbs` e `iniciar_silencioso.vbs`.
+## Elementos Incluidos en el ZIP
+- `adhd-assistant/` (código fuente completo, tests, APIs, herramientas, routers, prompts)
+- `YourFocusGuard/` (código fuente completo, motor `engine.py`, `scheduler.py`, interfaz nativa PySide6, web dashboard, tests)
+- `YourFocusGuard/config/` (configuraciones TOML base y de usuario)
+- Scripts de control (`iniciar_silencioso.vbs`, `detener_silencioso.vbs`, bat launchers)
+- Mascota activa (`einstein/` en `panel_static/pets/einstein`) para verificar la integración gráfica sin inflar peso.
+
+## Elementos Excluidos del ZIP (Detallados en el Manifiesto)
+1. `rea-analysis/` (~643.5 MB): Artefactos binarios de desensamblado y sesiones de ingeniería inversa.
+2. `panel_static/pets/` (~93 MB de sprites secundarios): Se conservan únicamente los recursos de la mascota activa (*Einstein*); se excluyen las 58 mascotas alternas (Goku, Nezuko, etc.).
+3. `data/fotos/` e imágenes temporales de webcam (~4 MB): Fotos de verificación de presencia.
+4. `_pytmp/`, `.pytest_cache/`, `__pycache__/` (~3 MB): Caché de compilación bytecode y casos temporales de pytest.
+5. `.git/`: Historial de commits y packfiles binarios de control de versiones.
+
+## Checklist de Ejecución
+- [ ] 1. Redactar `EXPLICACION_SISTEMA_Y_AUDITORIA.md` cubriendo descripción del programa, arquitectura dual, flujos y detalle de exclusiones.
+- [ ] 2. Generar script empaquetador en PowerShell que comprima respetando exclusiones.
+- [ ] 3. Validar integridad y tamaño del ZIP generado (< 5 MB).
+- [ ] 4. Confirmar que el archivo explicativo quede accesible.
