@@ -1,5 +1,5 @@
-# YourFocusGuard 🧠⚡
-> **Asistente inteligente de enfoque, gestión ejecutiva y productividad para personas con TDAH.**
+# Asistente TDAH + YourFocusGuard
+> **Suite de asistencia para TDAH: asistente por voz en la PC + panel táctil en tu celular.** 🧠⚡
 
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -14,6 +14,29 @@
 **YourFocusGuard** es un asistente diseñado específicamente para contrarrestar la disfunción ejecutiva, la ceguera temporal y las distracciones recurrentes en personas con TDAH. 
 
 Combina interacción por voz ultrarrápida, sincronización dual de tareas, reproducción de frecuencias de enfoque (ruido marrón y YouTube sin distracciones) y recordatorios contextuales en una interfaz reactiva.
+
+---
+
+## 🗂️ Dos aplicaciones, un solo proyecto
+
+Este repositorio contiene **dos aplicaciones independientes** — instala la que necesites:
+
+| Carpeta | Qué es | Instalar si quieres... |
+| :--- | :--- | :--- |
+| `adhd-assistant/` | **El producto principal** (v0.12.1): asistente por voz con Groq, tareas (Vikunja + Google Calendar), notas/briefing, alarmas, audio de enfoque y **widget para el celular** | El asistente y su panel web, en cualquier PC |
+| `YourFocusGuard/` | Guardián de foco para Windows (v0.8.5): vigilancia de ventana activa, escalera de desvíos, mascota de escritorio, modo concentración | La vigilancia automática en tu PC Windows |
+
+Ambos son locales y sin nube obligatoria; `adhd-assistant` no depende de `YourFocusGuard` para funcionar. El guardián está en modo mantenimiento (correcciones, sin features nuevas).
+
+## 📱 Widget en el celular (estilo PhoneBox)
+
+El asistente sirve un **panel táctil para el celular** sin instalar ninguna app: el navegador del teléfono hace de WebView y "Agregar a pantalla de inicio" lo deja como ícono tipo app.
+
+1. Empareja por Wi-Fi: ejecuta el asistente con `ASISTENTE_EXPUESTO_RED=1` (variable de entorno) — en la consola aparece la URL `http://TU-IP:8765/widget?t=CLAVE` y un **QR** escaneable (si instalaste `qrcode`).
+2. En el celular abre esa URL (la clave emparejada vive en `data/sesion_token.json`; bórrala para desemparejar todo).
+3. En Chrome/Edge del celular: menú → **Agregar a pantalla de inicio** → se instala como app a pantalla completa.
+
+El widget da: briefing del día, alarmas rápidas (+5/+15/+30/+1h y personalizadas, cancelables), tareas pendientes con check y alta de tareas, y notas rápidas (brain dump). Sin el modo red, el widget también funciona en la misma PC en `http://localhost:8765/widget`.
 
 ---
 

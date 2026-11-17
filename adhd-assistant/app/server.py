@@ -54,6 +54,101 @@ ORIGENES_PERMITIDOS = {
     f"http://127.0.0.1:{PORT}",
 }
 
+# ---------------------------------------------------------------------
+# v0.12.1 — Endurecimiento + modo widget (inspirado en PhoneBox)
+# ---------------------------------------------------------------------
+
+#: Tope del cuerpo JSON en bytes (igual que el panel del guardián: 64 KB).
+#: Antes el cuerpo se leía completo según Content-Length, sin límite.
+MAX_CUERPO_BYTES = 64 * 1024
+
+ARCHIVO_SESION = os.path.join(BASE_DIR, "data", "sesion_token.json")
+
+
+def _token_sesion() -> str:
+    """Clave emparejada persistente para usar el asistente desde el celular.
+
+    Equivalente a la 'paired key' de PhoneBox: se genera UNA vez, vive en
+    data/sesion_token.json y es la única credencial que acepta el servidor
+    para clientes que no son esta misma máquina. Loopback no la necesita.
+    Borrar el archivo la regenera (desempareja todos los dispositivos).
+    """
+    try:
+        os.makedirs(os.path.dirname(ARCHIVO_SESION), exist_ok=True)
+        if os.path.isfile(ARCHIVO_SESION):
+            with open(ARCHIVO_SESION, "r", encoding="utf-8") as f:
+                tok = (json.load(f) or {}).get("token", "")
+            if tok:
+                return str(tok)
+        import secrets
+        tok = secrets.token_urlsafe(24)
+        with open(ARCHIVO_SESION, "w", encoding="utf-8") as f:
+            json.dump(
+                {"token": tok, "creado": time.strftime("%Y-%m-%d %H:%M:%S")},
+                f, indent=2,
+            )
+        return tok
+    except Exception:
+        return ""  # sin archivo no hay acceso LAN; loopback sigue funcionando
+
+
+TOKEN_SESION = _token_sesion()
+
+#: Modo red: por defecto el servidor SOLO escucha en localhost. Con
+#: ASISTENTE_EXPUESTO_RED=1 escucha en todas las interfaces para que el
+#: celular abra el widget por Wi-Fi (siempre con token emparejado).
+EXPUESTO_RED = os.getenv("ASISTENTE_EXPUESTO_RED", "0") == "1"
+
+
+def _ip_lan() -> str:
+    """IP LAN principal de esta máquina ('' si no se puede determinar)."""
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))  # no envía tráfico: solo elige ruta
+            return s.getsockname()[0]
+        finally:
+            s.close()
+    except Exception:
+        return ""
+
+
+IP_LAN = _ip_lan()
+
+#: Hosts válidos para el header Host (anti DNS-rebinding)
+_HOSTS_PERMITIDOS = {
+    f"{h}:{PORT}" for h in ("localhost", "127.0.0.1", IP_LAN) if h
+}
+
+#: Orígenes http válidos (localhost + la IP LAN para el widget del celular)
+_ORIGENES_PERMITIDOS = set(ORIGENES_PERMITIDOS)
+if IP_LAN:
+    _ORIGENES_PERMITIDOS.add(f"http://{IP_LAN}:{PORT}")
+
+
+def _qr_disponible() -> bool:
+    try:
+        import qrcode  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def _qr_ascii() -> str:
+    """QR en texto (console) de la URL del widget. Requiere 'pip install qrcode'."""
+    if not (EXPUESTO_RED and IP_LAN and TOKEN_SESION):
+        return ""
+    try:
+        import qrcode
+        qr = qrcode.QRCode(border=1)
+        qr.add_data(f"http://{IP_LAN}:{PORT}/widget?t={TOKEN_SESION}")
+        qr.make()
+        return qr.print_ascii(invert=True) or ""
+    except Exception:
+        return ""
+
+
 _INICIO = time.time()
 
 
@@ -69,27 +164,104 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=UI_DIR, **kwargs)
 
-    # ---------- Seguridad de origen ----------
-    def _origen_permitido(self) -> bool:
-        origin = self.headers.get("Origin")
-        if not origin:
-            return True  # misma origen (navegador no envía Origin en GET propio) o curl
-        return origin in ORIGENES_PERMITIDOS
+    # ---------- Seguridad: Host / origen / token (v0.12.1) ----------
+    def _cliente_local(self) -> bool:
+        ip = self.client_address[0] if self.client_address else ""
+        return ip in ("127.0.0.1", "::1", "localhost")
+
+    def _token_recibido(self, parsed) -> str:
+        """Token emparejado: ?t=..., header X-Token o cookie widget_token."""
+        if parsed:
+            t = urllib.parse.parse_qs(parsed.query).get("t", [""])[0]
+            if t:
+                return t
+        xt = self.headers.get("X-Token", "")
+        if xt:
+            return xt
+        cookie = self.headers.get("Cookie", "")
+        if cookie:
+            try:
+                from http.cookies import SimpleCookie
+                c = SimpleCookie(cookie)
+                if "widget_token" in c:
+                    return c["widget_token"].value
+            except Exception:
+                pass
+        return ""
+
+    def _token_valido(self, parsed) -> bool:
+        return bool(TOKEN_SESION) and self._token_recibido(parsed) == TOKEN_SESION
+
+    def _host_permitido(self) -> bool:
+        host = self.headers.get("Host", "")
+        if not host:
+            return True  # cliente HTTP/1.0 sin Host: no aplica DNS-rebinding
+        return host in _HOSTS_PERMITIDOS
+
+    def _acceso_ok(self, parsed, url_path: str) -> bool:
+        """Autorización unificada (v0.12.1).
+
+        - Loopback (esta PC): como antes — la API exige Origin válido si el
+          navegador lo envía; los estáticos quedan libres.
+        - Cliente remoto (celular por LAN, modo widget): exige el token
+          emparejado en TODO (API y archivos estáticos).
+        """
+        if self._cliente_local():
+            if url_path.startswith("/api/"):
+                origin = self.headers.get("Origin")
+                if not origin:
+                    return True
+                return origin in _ORIGENES_PERMITIDOS
+            return True
+        return self._token_valido(parsed)
 
     def _rechazar_origen(self):
         self.send_response(403)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
-        self.wfile.write(b'{"status": "error", "message": "Origin no autorizado"}')
+        self.wfile.write(b'{"status": "error", "message": "Acceso no autorizado"}')
+
+    def _servir_widget_con_cookie(self):
+        """Sirve widget.html y fija la cookie del token emparejado."""
+        ruta = os.path.join(UI_DIR, "widget.html")
+        try:
+            with open(ruta, "rb") as f:
+                cuerpo = f.read()
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(cuerpo)))
+        if TOKEN_SESION:
+            self.send_header(
+                "Set-Cookie",
+                f"widget_token={TOKEN_SESION}; Path=/; HttpOnly; SameSite=Lax",
+            )
+        self.end_headers()
+        self.wfile.write(cuerpo)
 
     # ---------- GET ----------
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         url_path = parsed.path
 
-        # Rutas de API: verificar origen antes de responder
-        if url_path.startswith("/api/"):
-            if not self._origen_permitido():
+        # v0.12.1: validar el header Host en todas las rutas (DNS-rebinding)
+        if not self._host_permitido():
+            self._rechazar_origen()
+            return
+
+        # v0.12.1: entrada del widget (fija la cookie del token y sirve la página)
+        if url_path == "/widget":
+            if not self._acceso_ok(parsed, url_path):
+                self._rechazar_origen()
+                return
+            self._servir_widget_con_cookie()
+            return
+
+        # Rutas de API o cliente remoto: verificar acceso antes de responder
+        if url_path.startswith("/api/") or not self._cliente_local():
+            if not self._acceso_ok(parsed, url_path):
                 self._rechazar_origen()
                 return
 
@@ -175,6 +347,26 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, self._estado_salud())
                 return
 
+            # ---- v0.12.1: widget del celular ----
+            if url_path == "/api/widget_info":
+                url_lan = (
+                    f"http://{IP_LAN}:{PORT}/widget?t={TOKEN_SESION}"
+                    if EXPUESTO_RED and IP_LAN and TOKEN_SESION else ""
+                )
+                self._send_json(200, {
+                    "status": "ok",
+                    "modo_red": "lan" if EXPUESTO_RED else "local",
+                    "url_local": f"http://localhost:{PORT}/widget",
+                    "url_lan": url_lan,
+                    "token_configurado": bool(TOKEN_SESION),
+                    "qr_disponible": _qr_disponible(),
+                })
+                return
+
+            if url_path == "/api/widget/qr":
+                self._send_json(200, {"status": "ok", "qr": _qr_ascii()})
+                return
+
             # ---- v0.10: calendario ----
             if url_path == "/api/calendario/eventos":
                 dias = 1
@@ -186,8 +378,10 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, {"status": "ok", "eventos": calendar.listar_eventos(dias=dias)})
                 return
 
-            self._send_json(404, {"status": "error", "message": "Ruta no encontrada"})
-            return
+            if url_path.startswith("/api/"):
+                self._send_json(404, {"status": "error", "message": "Ruta no encontrada"})
+                return
+            # Cliente remoto (widget con token) pidiendo estáticos: sigue abajo
 
         # Archivos estáticos de la UI
         if url_path == "/":
@@ -198,12 +392,25 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         url_path = urllib.parse.urlparse(self.path).path
 
-        if url_path.startswith("/api/"):
-            if not self._origen_permitido():
+        if not self._host_permitido():
+            self._rechazar_origen()
+            return
+
+        if url_path.startswith("/api/") or not self._cliente_local():
+            if not self._acceso_ok(urllib.parse.urlparse(self.path), url_path):
                 self._rechazar_origen()
                 return
 
-        content_length = int(self.headers.get("Content-Length", 0))
+        content_length = int(self.headers.get("Content-Length", 0) or 0)
+        # v0.12.1: tope de cuerpo — antes se leía sin límite
+        if content_length > MAX_CUERPO_BYTES:
+            try:
+                # Drenar para no enviar TCP RST en Windows antes de que el cliente lea el 413
+                _ = self.rfile.read(min(content_length, 256 * 1024))
+            except Exception:
+                pass
+            self._send_json(413, {"status": "error", "message": "Cuerpo demasiado grande (máx 64 KB)"})
+            return
         post_data = self.rfile.read(content_length)
 
         try:
@@ -325,10 +532,35 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             self._send_json(200, response_payload)
             return
 
+        if url_path == "/api/timers":  # v0.12.1: alarma rápida desde el widget
+            try:
+                minutos = int(payload.get("minutos", 0))
+            except (TypeError, ValueError):
+                minutos = 0
+            label = str(payload.get("label", "Recordatorio")).strip()[:120]
+            if not 1 <= minutos <= 24 * 60:
+                self._send_json(400, {"status": "error", "message": "minutos debe estar entre 1 y 1440"})
+                return
+            res = timer_mgr.set_timer(duration_seconds=minutos * 60, label=label or "Recordatorio")
+            self._send_json(200, res)
+            return
+
         if url_path == "/api/tasks":
-            title = payload.get("title", "").strip()
-            priority = int(payload.get("priority", 2))
+            title = str(payload.get("title", "")).strip()[:200]
+            # v0.12.1: validación tipada — antes un priority no numérico
+            # mataba el hilo con un 500 y traceback
+            try:
+                priority = int(payload.get("priority", 2))
+            except (TypeError, ValueError):
+                self._send_json(400, {"status": "error", "message": "priority debe ser un número entero (1-5)"})
+                return
+            if not 1 <= priority <= 5:
+                self._send_json(400, {"status": "error", "message": "priority debe estar entre 1 y 5"})
+                return
             due_date = payload.get("due_date") or None
+            if due_date is not None and (not isinstance(due_date, str) or len(due_date) > 40):
+                self._send_json(400, {"status": "error", "message": "due_date inválida"})
+                return
             res = tasks_mgr.add_task(title=title, priority=priority, due_date=due_date)
             self._send_json(200, res)
             return
@@ -389,10 +621,23 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         url_path = parsed.path
 
-        if url_path.startswith("/api/"):
-            if not self._origen_permitido():
+        if not self._host_permitido():
+            self._rechazar_origen()
+            return
+
+        if url_path.startswith("/api/") or not self._cliente_local():
+            if not self._acceso_ok(parsed, url_path):
                 self._rechazar_origen()
                 return
+
+        # v0.12.1: cancelar alarma desde el widget  /api/timers/123
+        if url_path.startswith("/api/timers/"):
+            parte = url_path.rstrip("/").rsplit("/", 1)[-1]
+            if not parte.isdigit():
+                self._send_json(400, {"status": "error", "message": "Falta el id de la alarma"})
+                return
+            self._send_json(200, timer_mgr.cancel_timer(int(parte)))
+            return
 
         # /api/notas?id=123  o  /api/notas/123
         if url_path == "/api/notas" or url_path.startswith("/api/notas/"):
@@ -428,6 +673,7 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
                 "audios_en_cache": cache_tts,
             },
             "groq_configurado": bool(router.groq_api_key),
+            "modo_red": "lan" if EXPUESTO_RED else "local",  # v0.12.1
             "calendario_autenticado": calendar.is_authenticated(),
             "vikunja_configurado": bool(os.getenv("VIKUNJA_TOKEN", "").strip()),
             "herramientas": len(herramientas.nombres()),
@@ -456,13 +702,25 @@ def start_server():
     print("• Audio Engine: YouTube streaming + Ruido Marrón/Blanco activo", flush=True)
     print("• Memoria: notas + briefing diario + contexto de conversación", flush=True)
     print("• Registro de herramientas MCP-ready: " + str(len(herramientas.nombres())), flush=True)
+    print("• Widget para el celular: " + f"http://localhost:{PORT}/widget", flush=True)
     print("• Voz neuronal edge-tts: " + (
         "activa" if tts.listar_perfiles() else "no disponible (pip install edge-tts)"
     ), flush=True)
     print("=" * 65 + "\n", flush=True)
 
+    # v0.12.1: modo red opcional para el widget del celular (con token)
+    host = "0.0.0.0" if EXPUESTO_RED else "localhost"
+    if EXPUESTO_RED:
+        print("• Modo red ACTIVADO: el celular puede entrar por Wi-Fi", flush=True)
+        if IP_LAN and TOKEN_SESION:
+            print(f"  → En el celular abre: http://{IP_LAN}:{PORT}/widget?t={TOKEN_SESION}", flush=True)
+            qr = _qr_ascii()
+            if qr:
+                print(qr, flush=True)
+        print("  (clave emparejada en data/sesion_token.json — bórrala para desemparejar)", flush=True)
+
     # ThreadingHTTPServer: la síntesis de voz o YouTube no bloquean la UI
-    server = ThreadingHTTPServer(("localhost", PORT), AssistantHTTPHandler)
+    server = ThreadingHTTPServer((host, PORT), AssistantHTTPHandler)
     server.serve_forever()
 
 

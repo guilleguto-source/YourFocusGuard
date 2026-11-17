@@ -62,8 +62,22 @@ class TimerManager:
             "target_fecha": record["target_fecha"],
         }
 
+    def cancel_timer(self, timer_id: int) -> Dict[str, Any]:
+        """v0.12.1: cancela una alarma activa (botón del widget del celular)."""
+        for t in active_timers:
+            if t["id"] == timer_id and t["status"] == "active":
+                t["status"] = "cancelled"
+                return {
+                    "status": "ok",
+                    "message": f"Alarma cancelada: '{t['label']}'.",
+                }
+        return {"status": "error", "message": "No encontré una alarma activa con ese id."}
+
     def _run_timer(self, duration: float, label: str, record: dict):
         time.sleep(duration)
+        # v0.12.1: si la cancelaron mientras dormía, no sonar
+        if record.get("status") != "active":
+            return
         # Marcar terminado ANTES de la señal para que la UI lo detecte
         record["status"] = "finished"
         record["announced"] = False

@@ -210,8 +210,10 @@ class Router:
                     break
             return {"action": "audio_youtube", "query": query_music or "lofi beats for focus"}
 
-        # Offline: "anota/apunta que..." sin API key -> nota directa (v0.11)
-        if not self.groq_api_key and any(texto_lower.startswith(p) for p in ["anota", "apunta", "anotar que", "registra que"]):
+        # v0.12.1: "anota/apunta que..." SIEMPRE es nota directa (antes solo
+        # sin API key). Razón: resiliencia — si Groq cae, se bloquea o da 403,
+        # el brain dump por voz sigue funcionando. Es además 0 ms.
+        if any(texto_lower.startswith(p) for p in ["anota", "apunta", "anotar que", "registra que"]):
             texto_nota = re.sub(r"^(anota|apunta|anotar que|registra que)\s*(que\s*)?", "", text, flags=re.IGNORECASE).strip()
             if texto_nota:
                 return {"action": "nota_crear", "texto": texto_nota}

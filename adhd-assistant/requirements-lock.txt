@@ -1,0 +1,31 @@
+# ============================================================
+# requirements-lock.txt — Asistente TDAH v0.12.1
+# Versiones exactas probadas (Python 3.12, Windows/Linux).
+# Instalación reproducible:  pip install -r requirements-lock.txt
+# (generado a partir de la suite verde: 120/120 pruebas)
+# ============================================================
+
+# --- Directas ---
+google-api-python-client==2.202.0
+google-auth-oauthlib==1.5.0
+truststore==0.10.5
+python-dotenv==1.2.2
+yt-dlp==2026.10.26
+edge-tts==7.3.1
+qrcode==8.2                  # opcional: QR en consola para el widget
+
+# --- Transitivas fijadas (de las directas) ---
+google-auth==2.62.2
+google-auth-httplib2==0.4.4
+googleapis-common-protos==1.76.0
+proto-plus==1.29.0
+protobuf==7.36.2
+httplib2==0.32.1
+cachetools==7.0.5
+uritemplate==4.2.0
+pyasn1==0.6.5
+aiohttp==3.13.3
+websockets==16.0
+certifi==2026.2.25
+# Nota: 'rsa' y 'pyasn1-modules' solo se instalan si usas claves de cuenta de
+# servicio de Google; para OAuth de calendario de usuario no hacen falta.

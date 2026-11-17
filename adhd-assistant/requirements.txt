@@ -20,3 +20,6 @@ yt-dlp>=2024.8.6
 
 # Voz neuronal gratuita (Microsoft Edge TTS, sin API key)
 edge-tts>=7.0.0
+
+# QR en consola para emparejar el widget del celular (opcional pero recomendado)
+qrcode>=7.0

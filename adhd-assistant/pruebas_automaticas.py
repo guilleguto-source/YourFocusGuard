@@ -57,13 +57,15 @@ def seccion(titulo: str):
 # Cliente HTTP mínimo (sin dependencias externas)
 # ---------------------------------------------------------------------------
 
-def http(metodo: str, ruta: str, cuerpo: dict | None = None, origin: str | None = None):
+def http(metodo: str, ruta: str, cuerpo: dict | None = None, origin: str | None = None, host: str | None = None):
     url = BASE + ruta
     data = json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None
     req = urllib.request.Request(url, data=data, method=metodo)
     req.add_header("Content-Type", "application/json")
     if origin:
         req.add_header("Origin", origin)
+    if host:
+        req.add_header("Host", host)
     try:
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             cuerpo_resp = resp.read()
@@ -457,9 +459,91 @@ def esperar_servidor(segundos: float = 20.0) -> bool:
     return False
 
 
+def probar_endurecimiento_widget():
+    """v0.12.1: endurecimiento (body, Host, validación tipada) + widget móvil."""
+    seccion("9. Endurecimiento y widget (v0.12.1)")
+
+    # ---- Widget: página, manifest e icono ----
+    code, datos = http("GET", "/widget")
+    html = datos.get("_raw", b"")
+    check("GET /widget sirve la página táctil",
+          code == 200 and b"Asistente TDAH" in html, f"{code}")
+
+    code, datos = http("GET", "/manifest.webmanifest")
+    es_pwa = (
+        code == 200
+        and (datos.get("display") == "standalone" or b"standalone" in datos.get("_raw", b""))
+    )
+    check("GET /manifest.webmanifest (PWA instalable)", es_pwa, f"{code}")
+
+    code, datos = http("GET", "/icono-widget.png")
+    icono = datos.get("_raw", b"")
+    check("GET /icono-widget.png es un PNG real",
+          code == 200 and isinstance(icono, bytes) and icono[:4] == b"\x89PNG", f"{code}")
+
+    # ---- Widget: info de emparejamiento ----
+    code, wi = http("GET", "/api/widget_info")
+    check("GET /api/widget_info", code == 200 and wi.get("status") == "ok", str(wi)[:60])
+    check("widget_info: token emparejado generado", wi.get("token_configurado") is True)
+    check("widget_info: url_local presente", f"/widget" in str(wi.get("url_local", "")))
+
+    # ---- Alarmas rápidas desde el widget (POST /api/timers) ----
+    code, res = http("POST", "/api/timers", {"minutos": 1, "label": "prueba widget"})
+    check("POST /api/timers alarma rápida", code == 200 and res.get("status") == "ok", str(res)[:60])
+    code, timers = http("GET", "/api/timers")
+    lista = timers if isinstance(timers, list) else []
+    prueba = next((t for t in lista if t.get("label") == "prueba widget"), None)
+    check("GET /api/timers la lista", prueba is not None)
+    if prueba:
+        code, res = http("DELETE", f"/api/timers/{prueba['id']}")
+        check("DELETE /api/timers/{id} la cancela", code == 200 and res.get("status") == "ok", str(res)[:50])
+        code, timers2 = http("GET", "/api/timers")
+        sigue = any(t.get("label") == "prueba widget" for t in (timers2 if isinstance(timers2, list) else []))
+        check("cancelada ya no aparece activa", not sigue)
+
+    code, res = http("POST", "/api/timers", {"minutos": 5000})
+    check("POST /api/timers minutos fuera de rango -> 400", code == 400, f"{code}")
+    code, res = http("POST", "/api/timers", {"minutos": "abc"})
+    check("POST /api/timers minutos no numérico -> 400", code == 400, f"{code}")
+
+    # ---- Validación tipada de tareas (el 500 con traceback quedó atrás) ----
+    code, res = http("POST", "/api/tasks", {"title": "x", "priority": "alta"})
+    check("POST /api/tasks priority no numérico -> 400 (antes 500)", code == 400, f"{code}")
+    code, res = http("POST", "/api/tasks", {"title": "x", "priority": 9})
+    check("POST /api/tasks priority fuera de rango -> 400", code == 400, f"{code}")
+    code, res = http("POST", "/api/tasks", {"title": "tarea v0121", "priority": 3})
+    check("POST /api/tasks válida sigue funcionando", code == 200, f"{code}")
+
+    # ---- Tope de cuerpo 64 KB (antes se leía sin límite) ----
+    code, res = http("POST", "/api/notas", {"texto": "x" * 70000})
+    check("POST cuerpo de 70 KB -> 413", code == 413, f"{code}")
+
+    # ---- Host allowlist (anti DNS-rebinding) ----
+    code, res = http("GET", "/api/salud", host="evil.example.com")
+    check("Host ajeno (DNS-rebinding) -> 403", code == 403, f"{code}")
+
+    # ---- 'anota que...' ahora SIEMPRE es nota directa (con o sin Groq) ----
+    try:
+        from router import Router
+        r = Router()
+        r.groq_api_key = "clave-falsa-para-probar-resiliencia"
+        res_r = r.route("anota que la clave del wifi es 12345678")
+        check("router 'anota que...' -> nota_crear AUN con Groq configurado",
+              res_r.get("action") == "nota_crear", str(res_r.get("action")))
+    except Exception as e:
+        check("router 'anota que...' -> nota_crear AUN con Groq configurado", False, str(e)[:80])
+
+
+def probar_endurecimiento_widget_groq_activo():
+    """Con LLM activo (clave real), 'anota que...' debe seguir siendo nota."""
+    code, c3 = http("POST", "/api/chat", {"message": "anota que el código de prueba es 5555"})
+    check("chat 'anota que...' -> nota_crear (v0.12.1, sin depender del LLM)",
+          code == 200 and c3.get("action") == "nota_crear", str(c3.get("action", "?")))
+
+
 def main() -> int:
     print("=" * 62)
-    print("🧪 PRUEBAS AUTOMÁTICAS — Asistente TDAH v0.12")
+    print("🧪 PRUEBAS AUTOMÁTICAS — Asistente TDAH v0.12.1")
     print("=" * 62)
     print(f"Raíz del proyecto: {RAIZ}")
     print(f"Puerto de prueba:  {PUERTO} (tu servidor real en 8765 no se toca)")
@@ -498,6 +582,11 @@ def main() -> int:
             if groq_activo:
                 print("   (nota: Groq quedó activo por tu .env; pruebas LLM se relajan)")
             probar_http(groq_activo)
+            probar_endurecimiento_widget()
+            if groq_activo:
+                probar_endurecimiento_widget_groq_activo()
+            else:
+                check("chat 'anota que...' con LLM (omitido: sin clave Groq)", True, "sin clave", omitir_si=True)
     finally:
         proc.terminate()
         try:

@@ -1,0 +1,48 @@
+# Requerido por GitHub Actions antes de la suite de pruebas
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  guardian:
+    name: Guardián (pytest) — ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PortAudio (solo Linux, lo pide sounddevice)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r YourFocusGuard/requirements.txt
+          pip install pytest
+      - name: Suite del guardián
+        run: python -m pytest YourFocusGuard/tests -q
+
+  asistente:
+    name: Asistente (suite de integración)
+    runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: ""      # determinista: reglas rápidas sin LLM
+      VIKUNJA_TOKEN: ""     # modo local, sin tocar servicios reales
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r adhd-assistant/requirements.txt qrcode
+      - name: Suite del asistente (120 pruebas)
+        run: python adhd-assistant/pruebas_automaticas.py

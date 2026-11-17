@@ -1,6 +1,43 @@
 # Changelog
 
-Formato: [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) · versionado [SemVer](https://semver.org/lang/es/).
+Formato: [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) · versionado [SemVer](https://semver.org/lang/es-).
+
+## [0.8.5] — 2026-11-17
+
+**Endurecimiento del modo concentración: recuperación fiable de `hosts` y del volumen (hallazgos de la auditoría).**
+Dos bugs HIGH corregidos: las líneas de bloqueo se escribían DOS veces (una suelta fuera del bloque marcado) y un crash dejaba huérfanos que bloqueaban dominios para siempre; y el volumen se restauraba a ~50 % fijo en lugar del valor original.
+
+### Corregido
+
+- **`actions/concentracion.py::_bloquear_dominios_hosts`**: ahora TODO va dentro del bloque `BEGIN/END`; no hay líneas sueltas. Antes de escribir, se guarda un **journal** (`%TEMP%/YourFocusGuard_hosts_journal.json`) con las líneas añadidas.
+- **`limpiar_huerfanos_hosts`**: al arrancar limpia el bloque marcado + las líneas del journal + los huérfanos heredados de versiones < 0.8.5 (formato exacto `127.0.0.1 <dominio-defecto>`). Las entradas del usuario con otro formato (ej. `0.0.0.0 ...`) no se tocan jamás.
+- **Restauración exacta del volumen**: `_silenciar_audio` guarda el DWORD original (`_vol_original`); `_restaurar_audio` lo devuelve tal cual (si el usuario ya estaba muteado, sigue muteado; si no se llegó a leer el volumen, no se inventa ningún valor).
+
+### Añadido
+
+- `tests/test_concentracion_v085.py`: 8 pruebas de regresión (bloque sin líneas sueltas, recuperación tras crash con y sin journal, hosts del usuario intacto, volumen exacto restaurado, volumen 0 permanece 0).
+
+## [0.8.4] — 2026-11-10
+
+**Cadena de voz Groq resiliente y honesta (incidente de campo nov-2026).**
+Groq decomisionó `llama-3.3-70b-versatile` y `llama-3.1-8b-instant` para cuentas
+free/developer el 16/08/2026 (console.groq.com/docs/deprecations); la cadena de
+LLM de la v0.8.3 quedó entera muerta y cada turno de voz terminaba en el mensaje
+"¡Te escuché! ¡Sigamos con energía!", que disfrazaba el fallo de éxito.
+
+### Corregido
+
+- **`actions/groq_voice.py::MODELOS_LLM`**: cadena viva con los reemplazos
+  recomendados por la propia documentación de Groq:
+  `qwen/qwen3.8-27b` (preview, mejor español) → `openai/gpt-oss-120b` →
+  `openai/gpt-oss-20b` (producción).
+- **Fallback de cadena**: antes, cualquier HTTP ≠ 404 (410, 429, 5xx) hacía
+  `break` y mataba el turno aunque hubiera modelos vivos detrás. Ahora solo
+  401/403 abortan (clave inválida / bloqueo de borde que afecta a todos los
+  modelos por igual); cualquier otro error salta al siguiente modelo.
+- **Mensaje de fallo honesto**: el turno fallido ya no responde algo que suena
+  a confirmación; ahora admite el fallo ("No pude conectar con mi cabeza en la
+  nube, ¡pero aquí sigo contigo!"). Lo mismo para el caso sin `GROQ_API_KEY`.
 
 ## [0.8.3] — 2026-11-10
 

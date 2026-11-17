@@ -1,7 +1,7 @@
 # Hoja de Ruta — Asistente TDAH
 
-**Actualizado:** 12 de noviembre de 2026 · **Versión actual:** v0.12.0
-**Estado:** 102/102 pruebas automáticas OK → listo para la fase MCP
+**Actualizado:** 17 de noviembre de 2026 · **Versión actual:** v0.12.1
+**Estado:** asistente 120/120 pruebas OK · guardián 293/293 OK → listo para la fase MCP
 
 ---
 
@@ -14,6 +14,7 @@
 | **v0.10** | **Consolidación:** limpieza Docker/Redis/código muerto + sync bidireccional tareas↔Google Calendar + fechas completas en alarmas | ✅ **hecho** |
 | **v0.11** | **Memoria:** notas rápidas con búsqueda, memoria de conversación (contexto al LLM), briefing diario hablado | ✅ **hecho** |
 | **v0.12** | **Prep MCP:** registro central de 12 herramientas con esquemas JSON, /api/salud, suite de 102 pruebas automáticas | ✅ **hecho** |
+| **v0.12.1** | **Endurecimiento + widget móvil** (a partir de la auditoría externa): tope de body 64KB, validación Host anti DNS-rebinding, token emparejado, validación tipada de tareas, "anota que..." incondicional; **panel táctil para el celular estilo PhoneBox** (PWA + QR + LAN con clave); guardián: fix hosts sin huérfanos + journal de crash + volumen exacto; CI en GitHub Actions + lockfiles + README con límite de las dos apps | ✅ **hecho** |
 | v0.13 | **Fase MCP** (ver §4) | ⏭️ siguiente |
 
 ---
@@ -107,3 +108,22 @@ principal; MCP es una puerta adicional.
 Cada versión debe pasar `python pruebas_automaticas.py` en verde antes
 de considerar el siguiente paso. La suite hace backup de tus datos y
 usa el puerto 8799: puedes ejecutarla con tu servidor real andando.
+
+## 7. Widget del celular (v0.12.1, inspirado en PhoneBox)
+
+Equivalente nativo al modo Wi-Fi de PhoneBox (panel táctil + clave
+emparejada), pero sin instalar nada en el teléfono: el navegador hace
+de WebView.
+
+1. En la PC: `set ASISTENTE_EXPUESTO_RED=1` y arranca el servidor →
+   consola muestra `http://TU-IP:8765/widget?t=CLAVE` + QR (si hay
+   `pip install qrcode`).
+2. En el celular: abre la URL → "Agregar a pantalla de inicio" →
+   app a pantalla completa con briefing, alarmas (+5/+15/+30/+1h,
+   cancelables), tareas y notas rápidas.
+3. Seguridad: sin modo red el servidor sigue atado a localhost; con
+   modo red, TODO cliente remoto exige el token emparejado
+   (`data/sesion_token.json`; borrar el archivo desempareja).
+
+Verificación: pruebas 102–120 de la suite (widget, body 64KB, Host,
+validación tipada, token).

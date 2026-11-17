@@ -20,11 +20,13 @@ Nunca lanza excepciones que maten al agente: cada medida se envuelve en try/exce
 from __future__ import annotations
 
 import ctypes
+import json
 import logging
 import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 from ctypes import wintypes
 from pathlib import Path
@@ -64,6 +66,36 @@ _HOSTS_LINEA = "127.0.0.1 {dominio}"
 _MARCADOR_INICIO = "# BEGIN YourFocusGuard (Concentracion)"
 _MARCADOR_FIN = "# END YourFocusGuard (Concentracion)"
 
+#: v0.8.5: journal de recuperación. Antes de tocar el hosts guardamos qué
+#: líneas añadimos; si el proceso muere sin poder desactivar, el arranque
+#: siguiente limpia por journal aunque el bloque marcado se haya corrompido.
+_JOURNAL_RUTA = Path(tempfile.gettempdir()) / "YourFocusGuard_hosts_journal.json"
+
+
+def _journal_guardar(lineas: list[str]) -> None:
+    try:
+        _JOURNAL_RUTA.write_text(
+            json.dumps({"lineas": lineas}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass  # sin journal seguimos: el bloque marcado es el respaldo principal
+
+
+def _journal_cargar() -> list[str]:
+    try:
+        datos = json.loads(_JOURNAL_RUTA.read_text(encoding="utf-8"))
+        return [str(l) for l in datos.get("lineas", []) if isinstance(l, str)]
+    except Exception:
+        return []
+
+
+def _journal_borrar() -> None:
+    try:
+        _JOURNAL_RUTA.unlink(missing_ok=True)
+    except OSError:
+        pass
+
 
 def _hosts_ruta() -> Path:
     """Ruta del archivo hosts de Windows."""
@@ -99,16 +131,58 @@ def _escribir_hosts(contenido: str) -> bool:
         return False
 
 
+def _extraer_contaminacion(contenido: str, lineas_journal: list[str] | None = None) -> str:
+    """Quita el bloque marcado y las líneas sueltas conocidas del contenido.
+
+    v0.8.5: versiones anteriores (< 0.8.5) escribían cada dominio DOS veces
+    (una suelta fuera del bloque); tras un crash quedaban huérfanos sin
+    marcador que bloqueaban dominios para siempre. Limpia el bloque, las
+    líneas del journal y los huérfanos heredados de los dominios por defecto.
+    """
+    def _quitar_bloque(texto: str) -> str:
+        """Elimina línea a línea desde BEGIN hasta END (conserva el resto EXACTO)."""
+        resultado, dentro = [], False
+        for ln in texto.splitlines(keepends=True):
+            s = ln.strip()
+            if s == _MARCADOR_INICIO:
+                dentro = True
+                continue
+            if s == _MARCADOR_FIN:
+                dentro = False
+                continue
+            if not dentro:
+                resultado.append(ln)
+        return "".join(resultado)
+
+    limpio = _quitar_bloque(contenido)
+
+    a_quitar = set(lineas_journal if lineas_journal is not None else _journal_cargar())
+    # Herencia: formato exacto que generaban las versiones < 0.8.5
+    for dominio in DOMINIOS_POR_DEFECTO:
+        a_quitar.add(_HOSTS_LINEA.format(dominio=dominio))
+
+    if not a_quitar:
+        return limpio
+    filtradas = [ln for ln in limpio.splitlines(keepends=True) if ln.strip() not in a_quitar]
+    return "".join(filtradas)
+
+
 def limpiar_huerfanos_hosts() -> bool:
-    """Elimina cualquier bloque residual de YourFocusGuard del archivo hosts."""
+    """Elimina cualquier residuo de YourFocusGuard del archivo hosts:
+    el bloque marcado, las líneas del journal y huérfanos de versiones
+    anteriores (se llama al arrancar y tras un crash)."""
     if not _IS_WINDOWS:
         return True
     contenido = _leer_hosts()
-    if not contenido or _MARCADOR_INICIO not in contenido:
+    if not contenido:
         return True
-    pattern = re.compile(rf"\n?{re.escape(_MARCADOR_INICIO)}.*?{re.escape(_MARCADOR_FIN)}\n?", re.DOTALL)
-    limpio = pattern.sub("", contenido)
-    return _escribir_hosts(limpio)
+    limpio = _extraer_contaminacion(contenido)
+    if limpio == contenido:
+        return True  # nada que limpiar
+    ok = _escribir_hosts(limpio)
+    if ok:
+        _journal_borrar()
+    return ok
 
 
 def _ya_bloqueado(contenido: str, dominio: str) -> bool:
@@ -128,7 +202,7 @@ class ModoConcentracion:
         self.reloj = reloj
         self.activo = False
         self._hosts_lineas_anadidas: list[str] = []
-        self._audio_was_muted = False
+        self._vol_original: int | None = None  # v0.8.5: DWORD exacto previo
         self._inicio: float | None = None
 
     # ------------------------------------------------------------------ #
@@ -177,6 +251,7 @@ class ModoConcentracion:
                 resultado["audio"] = self._restaurar_audio()
 
         self._hosts_lineas_anadidas = []
+        self._vol_original = None
         self._inicio = None
         log.info("modo máxima concentración desactivado: hosts=%s audio=%s",
                  resultado["hosts"], resultado["audio"])
@@ -220,20 +295,23 @@ class ModoConcentracion:
                 continue  # ya estaba bloqueado, no duplicar
             if linea in lineas_anadidas:
                 continue
-            para_escribir += linea + "\n"
             lineas_anadidas.append(linea)
 
         if not lineas_anadidas:
             return True, []  # todo ya bloqueado
 
-        para_escribir += f"{_MARCADOR_INICIO}\n"
-        for l in lineas_anadidas:
-            para_escribir += f"{l}\n"
-        para_escribir += f"{_MARCADOR_FIN}\n"
-
-        ok = _escribir_hosts(para_escribir)
+        # v0.8.5: TODO va DENTRO del bloque marcado. Antes las líneas se
+        # escribían dos veces (una suelta y otra en el bloque) y un crash
+        # dejaba huérfanos sin marcador que bloqueaban dominios para siempre.
+        bloque = (
+            f"{_MARCADOR_INICIO}\n"
+            + "".join(f"{l}\n" for l in lineas_anadidas)
+            + f"{_MARCADOR_FIN}\n"
+        )
+        ok = _escribir_hosts(para_escribir + bloque)
         if ok:
             self._hosts_lineas_anadidas = lineas_anadidas
+            _journal_guardar(lineas_anadidas)  # por si el proceso muere luego
             # Forzar vaciado de la caché DNS de Windows
             try:
                 import subprocess
@@ -246,25 +324,27 @@ class ModoConcentracion:
         return ok, lineas_anadidas
 
     def _restaurar_hosts(self) -> bool:
-        """Quita las líneas de hosts añadidas y limpia el bloque delimitado."""
+        """Quita el bloque marcado y las líneas del journal (v0.8.5)."""
         contenido = _leer_hosts()
         if not contenido:
+            _journal_borrar()
             return True
-        pattern = re.compile(rf"\n?{re.escape(_MARCADOR_INICIO)}.*?{re.escape(_MARCADOR_FIN)}\n?", re.DOTALL)
-        nuevo = pattern.sub("", contenido)
-        lineas = nuevo.splitlines(keepends=True)
-        filtradas = [
-            ln for ln in lineas
-            if ln.strip() not in self._hosts_lineas_anadidas
-        ]
-        return _escribir_hosts("".join(filtradas))
+        limpio = _extraer_contaminacion(contenido)
+        ok = _escribir_hosts(limpio)
+        if ok:
+            _journal_borrar()
+        return ok
 
     # ------------------------------------------------------------------ #
     # Audio
     # ------------------------------------------------------------------ #
 
     def _silenciar_audio(self) -> bool:
-        """Mute del dispositivo de audio por defecto (Windows, vía API de waveOut)."""
+        """Mute del dispositivo de audio por defecto (Windows, vía API de waveOut).
+
+        v0.8.5: guarda el volumen EXACTO previo para restaurarlo tal cual
+        (antes solo recordaba si estaba muteado y restauraba ~50% fijo).
+        """
         if not _IS_WINDOWS:
             return False
         try:
@@ -275,7 +355,7 @@ class ModoConcentracion:
             if rc != 0:
                 log.debug("waveOutGetVolume falló (rc=%s): no se puede silenciar", rc)
                 return False
-            self._audio_was_muted = vol_actual.value == 0
+            self._vol_original = int(vol_actual.value)
             rc = winmm.waveOutSetVolume(-1, 0)
             if rc != 0:
                 log.debug("waveOutSetVolume falló (rc=%s)", rc)
@@ -286,19 +366,19 @@ class ModoConcentracion:
             return False
 
     def _restaurar_audio(self) -> bool:
-        """Vuelve el volumen al estado previo (0 si ya estaba muteado, o lo que fuera)."""
+        """v0.8.5: devuelve el volumen EXACTO que había antes del mute."""
         if not _IS_WINDOWS:
             return False
-        if not self._audio_was_muted:
-            # Restaurar a un volumen audible por defecto (50 %)
-            try:
-                winmm = ctypes.windll.winmm
-                vol = wintypes.DWORD(0x7FFF7FFF)  # ~50 % en ambos canales
-                winmm.waveOutSetVolume(-1, vol)
-                return True
-            except Exception:  # pragma: no cover
-                return False
-        return True  # ya estaba muteado, no tocamos nada
+        if self._vol_original is None:
+            # Nunca llegamos a leer el volumen original: no tocar nada es
+            # más seguro que fijar un valor arbitrario.
+            return True
+        try:
+            winmm = ctypes.windll.winmm
+            winmm.waveOutSetVolume(-1, wintypes.DWORD(self._vol_original))
+            return True
+        except Exception:  # pragma: no cover
+            return False
 
     # ------------------------------------------------------------------ #
     # Bloqueo de procesos (minimizar al frente)

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0e1220">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Asistente TDAH</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icono-widget.png">
+  <link rel="apple-touch-icon" href="/icono-widget.png">
+  <link rel="stylesheet" href="widget.css">
+</head>
+<body>
+  <header>
+    <div class="marca">
+      <img src="icono-widget.png" alt="" class="logo">
+      <div>
+        <h1>Asistente TDAH</h1>
+        <p id="fecha-hoy">&nbsp;</p>
+      </div>
+    </div>
+    <div class="reloj-caja">
+      <span id="reloj">--:--</span>
+      <span id="estado-dot" class="dot" title="Estado del servidor"></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Briefing -->
+    <section class="tarjeta">
+      <div class="tarjeta-cabecera">
+        <h2>Briefing de hoy</h2>
+        <button class="btn-mini" id="btn-briefing" type="button">Refrescar</button>
+      </div>
+      <div id="briefing" class="briefing">Toca "Refrescar" para ver tu resumen.</div>
+    </section>
+
+    <!-- Alarmas rápidas -->
+    <section class="tarjeta">
+      <h2>Alarmas rápidas</h2>
+      <div class="fila-atalajos">
+        <button class="btn-atalajo" data-min="5" type="button">+5 min</button>
+        <button class="btn-atalajo" data-min="15" type="button">+15 min</button>
+        <button class="btn-atalajo" data-min="30" type="button">+30 min</button>
+        <button class="btn-atalajo" data-min="60" type="button">+1 h</button>
+      </div>
+      <div class="fila-personalizada">
+        <input id="min-custom" type="number" min="1" max="1440" inputmode="numeric" placeholder="min">
+        <input id="label-custom" type="text" maxlength="100" placeholder="¿Qué te recuerdo?">
+        <button class="btn-primario" id="btn-alarma" type="button">Programar</button>
+      </div>
+      <div id="lista-alarmas" class="lista"></div>
+    </section>
+
+    <!-- Tareas -->
+    <section class="tarjeta">
+      <div class="tarjeta-cabecera">
+        <h2>Tareas pendientes</h2>
+        <button class="btn-mini" id="btn-tareas" type="button">Refrescar</button>
+      </div>
+      <div class="fila-personalizada">
+        <input id="tarea-nueva" type="text" maxlength="200" placeholder="Nueva tarea...">
+        <select id="tarea-prioridad">
+          <option value="1">Urgente</option>
+          <option value="2" selected>Alta</option>
+          <option value="3">Normal</option>
+          <option value="4">Baja</option>
+        </select>
+        <button class="btn-primario" id="btn-tarea" type="button">Agregar</button>
+      </div>
+      <div id="lista-tareas" class="lista"></div>
+    </section>
+
+    <!-- Nota rápida (brain dump) -->
+    <section class="tarjeta">
+      <h2>Nota rápida</h2>
+      <textarea id="nota-texto" rows="3" maxlength="2000" placeholder="Idea, código, dato... sin pensar demasiado"></textarea>
+      <button class="btn-primario ancho" id="btn-nota" type="button">Guardar nota</button>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="widget.js"></script>
+</body>
+</html>

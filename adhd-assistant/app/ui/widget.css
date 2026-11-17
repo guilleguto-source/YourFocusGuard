@@ -1,0 +1,197 @@
+/* Widget del celular — Asistente TDAH (v0.12.1)
+   Diseño oscuro táctil: botones grandes (min 48 px), una sola mano. */
+
+:root {
+  --fondo: #0e1220;
+  --tarjeta: #171d31;
+  --tarjeta-borde: #262f4d;
+  --texto: #e8ecf7;
+  --texto-suave: #93a0c2;
+  --acento: #4f8cff;
+  --acento-tap: #3b6fd1;
+  --ok: #3ecf8e;
+  --alarma: #ffb64f;
+  --peligro: #ff6b6b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+  padding: 12px 12px calc(24px + env(safe-area-inset-bottom));
+  max-width: 560px;
+  margin: 0 auto;
+  user-select: none;
+}
+
+/* ---------- Cabecera ---------- */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 4px 14px;
+}
+
+.marca { display: flex; align-items: center; gap: 10px; }
+.marca .logo { width: 40px; height: 40px; border-radius: 10px; }
+.marca h1 { font-size: 1.05rem; letter-spacing: 0.02em; }
+.marca p { font-size: 0.72rem; color: var(--texto-suave); }
+
+.reloj-caja { display: flex; align-items: center; gap: 8px; }
+#reloj { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--peligro);
+  transition: background 0.3s;
+}
+.dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+
+/* ---------- Tarjetas ---------- */
+main { display: flex; flex-direction: column; gap: 14px; }
+
+.tarjeta {
+  background: var(--tarjeta);
+  border: 1px solid var(--tarjeta-borde);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.tarjeta h2 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--texto-suave); margin-bottom: 10px; }
+.tarjeta-cabecera { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.tarjeta-cabecera h2 { margin-bottom: 0; }
+
+/* ---------- Briefing ---------- */
+.briefing {
+  white-space: pre-wrap;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--texto);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* ---------- Botones ---------- */
+button {
+  font-family: inherit;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--texto);
+  transition: transform 0.08s, filter 0.15s;
+}
+button:active { transform: scale(0.96); filter: brightness(0.9); }
+
+.btn-primario {
+  background: var(--acento);
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 12px 16px;
+  min-height: 48px;
+}
+.btn-primario.ancho { width: 100%; margin-top: 10px; }
+
+.btn-mini {
+  background: transparent;
+  border: 1px solid var(--tarjeta-borde);
+  color: var(--texto-suave);
+  font-size: 0.72rem;
+  padding: 6px 10px;
+}
+
+.fila-atalajos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+
+.btn-atalajo {
+  background: #20294a;
+  border: 1px solid var(--tarjeta-borde);
+  color: var(--alarma);
+  font-weight: 700;
+  font-size: 0.9rem;
+  min-height: 48px;
+}
+
+.fila-personalizada { display: flex; gap: 8px; }
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: #10162a;
+  border: 1px solid var(--tarjeta-borde);
+  border-radius: 12px;
+  color: var(--texto);
+  padding: 12px;
+  min-height: 48px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--acento); border-color: transparent; }
+
+input[type="number"] { width: 76px; flex: none; }
+input[type="text"] { flex: 1; min-width: 0; }
+select { flex: none; width: 96px; }
+textarea { width: 100%; resize: vertical; }
+
+/* ---------- Listas ---------- */
+.lista { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #10162a;
+  border: 1px solid var(--tarjeta-borde);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.item .texto { flex: 1; min-width: 0; font-size: 0.92rem; overflow-wrap: anywhere; }
+.item .detalle { font-size: 0.7rem; color: var(--texto-suave); }
+
+.item .btn-item {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--tarjeta-borde);
+  min-width: 48px;
+  min-height: 44px;
+  font-size: 1rem;
+}
+.item .btn-item.hecho { color: var(--ok); }
+.item .btn-item.cancelar { color: var(--peligro); }
+
+.badge {
+  flex: none;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #20294a;
+  color: var(--texto-suave);
+}
+.badge.p1 { color: var(--peligro); }
+.badge.p2 { color: var(--alarma); }
+.badge.p3 { color: var(--acento); }
+
+.vacio { color: var(--texto-suave); font-size: 0.85rem; text-align: center; padding: 8px 0; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(20px);
+  background: #262f4d;
+  color: var(--texto);
+  font-size: 0.88rem;
+  padding: 12px 18px;
+  border-radius: 14px;
+  max-width: 88vw;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 50;
+}
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
