@@ -155,6 +155,7 @@ visible = true                # false = sin ventana (solo consola/toasts)
 tema = "clasico"              # clasico | oscuro | calido (o añade el tuyo en mascota.py)
 posicion = "inferior_derecha" # inferior_derecha | inferior_izquierda
 ancho = 150                   # px del lienzo
+destino = "ambos"             # pc | celular | ambos
 
 [avatar]                     # v0.6.0: qué cara pone el asistente
 # auto      = OpenPets si está abierto; si no, avatar embed en panel, o mascota tkinter

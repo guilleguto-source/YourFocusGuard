@@ -40,6 +40,10 @@ timer_mgr = TimerManager()
 audio_engine = AudioEngine()
 
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PETS_DIR = os.path.join(ROOT_DIR, "YourFocusGuard", "yourfocusguard", "panel_static", "pets")
+YFG_PORT = int(os.getenv("YFG_PUERTO", "8756"))
+YFG_URL = f"http://127.0.0.1:{YFG_PORT}"
 
 #: Puerto configurable (lo usa pruebas_automaticas.py para no chocar con
 #: tu servidor real en 8765)
@@ -52,6 +56,10 @@ PORT = int(os.getenv("ASISTENTE_PUERTO", "8765"))
 ORIGENES_PERMITIDOS = {
     f"http://localhost:{PORT}",
     f"http://127.0.0.1:{PORT}",
+    "http://localhost:8765",
+    "http://127.0.0.1:8765",
+    "http://localhost:8766",
+    "http://127.0.0.1:8766",
 }
 
 # ---------------------------------------------------------------------
@@ -221,9 +229,24 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b'{"status": "error", "message": "Acceso no autorizado"}')
 
-    def _servir_widget_con_cookie(self):
-        """Sirve widget.html y fija la cookie del token emparejado."""
-        ruta = os.path.join(UI_DIR, "widget.html")
+    def _servir_archivo_ui(self, nombre_archivo: str):
+        ruta = os.path.join(UI_DIR, nombre_archivo)
+        try:
+            with open(ruta, "rb") as f:
+                cuerpo = f.read()
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(cuerpo)))
+        self.end_headers()
+        self.wfile.write(cuerpo)
+
+    def _servir_widget_con_cookie(self, archivo: str = "widget.html"):
+        """Sirve el widget móvil (panel o mascota) y fija la cookie del token emparejado."""
+        ruta = os.path.join(UI_DIR, archivo)
         try:
             with open(ruta, "rb") as f:
                 cuerpo = f.read()
@@ -241,6 +264,64 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(cuerpo)
 
+    def _proxy_a_yfg(self, parsed):
+        url = f"{YFG_URL}{parsed.path}"
+        if parsed.query:
+            url += f"?{parsed.query}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "ADHD-WidgetMascota"})
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                data = resp.read()
+                self.send_response(resp.status)
+                self.send_header("Content-Type", resp.headers.get("Content-Type", "application/json"))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(data)
+        except Exception as e:
+            self._send_json(502, {"status": "error", "message": f"YourFocusGuard no disponible: {e}"})
+
+    def _proxy_post_a_yfg(self, url_path: str, payload: dict):
+        url = f"{YFG_URL}{url_path}"
+        try:
+            cuerpo = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=cuerpo,
+                headers={"Content-Type": "application/json", "User-Agent": "ADHD-WidgetMascota"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                data = resp.read()
+                self.send_response(resp.status)
+                self.send_header("Content-Type", resp.headers.get("Content-Type", "application/json"))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(data)
+        except Exception as e:
+            self._send_json(502, {"status": "error", "message": f"YourFocusGuard no disponible: {e}"})
+
+    def _proxy_o_servir_pets(self, url_path: str):
+        partes = [p for p in url_path.split("/") if p]
+        if len(partes) >= 2:
+            rel = os.path.join(*partes[1:])
+            ruta_archivo = os.path.join(PETS_DIR, rel)
+            if os.path.isfile(ruta_archivo):
+                mime = "image/webp" if ruta_archivo.endswith(".webp") else "application/json" if ruta_archivo.endswith(".json") else "image/png"
+                try:
+                    with open(ruta_archivo, "rb") as f:
+                        data = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", mime)
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                except OSError:
+                    pass
+        parsed = urllib.parse.urlparse(self.path)
+        self._proxy_a_yfg(parsed)
+
     # ---------- GET ----------
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -252,17 +333,40 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         # v0.12.1: entrada del widget (fija la cookie del token y sirve la página)
-        if url_path == "/widget":
+        if url_path in ("/widget", "/widget/"):
             if not self._acceso_ok(parsed, url_path):
                 self._rechazar_origen()
                 return
-            self._servir_widget_con_cookie()
+            self._servir_widget_con_cookie("widget.html")
+            return
+
+        if url_path in ("/widget-mascota", "/widget-mascota/"):
+            if not self._acceso_ok(parsed, url_path):
+                self._rechazar_origen()
+                return
+            self._servir_widget_con_cookie("widget-mascota.html")
+            return
+
+        if url_path.startswith("/pets/"):
+            self._proxy_o_servir_pets(url_path)
+            return
+
+        if url_path == "/agent-sessions":
+            self._servir_archivo_ui("agent_sessions.html")
+            return
+
+        if url_path == "/agent-hub":
+            self._servir_archivo_ui("agent_hub.html")
             return
 
         # Rutas de API o cliente remoto: verificar acceso antes de responder
         if url_path.startswith("/api/") or not self._cliente_local():
             if not self._acceso_ok(parsed, url_path):
                 self._rechazar_origen()
+                return
+
+            if url_path.startswith("/api/pet/"):
+                self._proxy_a_yfg(parsed)
                 return
 
             if url_path == "/api/tasks":
@@ -378,6 +482,16 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
                 self._send_json(200, {"status": "ok", "eventos": calendar.listar_eventos(dias=dias)})
                 return
 
+            # ---- Multi-Agent Telemetry (Antigravity 2.0 + DeepSeek) ----
+            if url_path == "/api/agents/state":
+                try:
+                    import agents_telemetry
+                    self._send_json(200, agents_telemetry.get_all_state())
+                except Exception as e:
+                    logger.error("Error en telemetría de agentes: %s", e)
+                    self._send_json(500, {"status": "error", "message": str(e)})
+                return
+
             if url_path.startswith("/api/"):
                 self._send_json(404, {"status": "error", "message": "Ruta no encontrada"})
                 return
@@ -417,6 +531,10 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             payload = json.loads(post_data.decode("utf-8")) if post_data else {}
         except Exception:
             payload = {}
+
+        if url_path.startswith("/api/pet/") or url_path == "/api/control":
+            self._proxy_post_a_yfg(url_path, payload)
+            return
 
         if url_path == "/api/chat":
             message = payload.get("message", "").strip()
@@ -682,9 +800,20 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             "alarmas_activas": len(timer_mgr.list_active_timers()),
         }
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        origin = self.headers.get("Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.end_headers()
+
     def _send_json(self, code: int, data: Any):
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
 

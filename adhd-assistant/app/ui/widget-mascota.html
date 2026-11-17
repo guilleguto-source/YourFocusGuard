@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0e1220">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Mascota TDAH</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icono-widget.png">
+  <link rel="apple-touch-icon" href="/icono-widget.png">
+  <link rel="stylesheet" href="widget.css">
+  <link rel="stylesheet" href="widget-mascota.css">
+</head>
+<body class="cuerpo-mascota">
+  <header>
+    <div class="marca">
+      <img src="icono-widget.png" alt="" class="logo">
+      <div>
+        <h1 id="pet-nombre">Einstein</h1>
+        <p id="pet-estado-texto">Compañero activo</p>
+      </div>
+    </div>
+    <div class="reloj-caja">
+      <span id="reloj">--:--</span>
+      <span id="estado-dot" class="dot" title="Estado del enlace"></span>
+    </div>
+  </header>
+
+  <!-- Pestañas de cambio rápido de vista -->
+  <nav class="nav-pestañas">
+    <a href="/widget" class="pestaña">📋 Tareas y Alarmas</a>
+    <a href="/widget-mascota" class="pestaña activa">🐶 Mascota</a>
+  </nav>
+
+  <main class="main-mascota">
+    <!-- Diálogo / Burbuja contextual -->
+    <div id="burbuja" class="burbuja-mascota">
+      <div id="burbuja-texto" class="burbuja-texto">¡Todo listo para avanzar con foco!</div>
+      <div id="burbuja-opciones" class="burbuja-opciones"></div>
+    </div>
+
+    <!-- Contenedor del Avatar con 50% de movimiento -->
+    <div class="avatar-marco">
+      <div id="avatar-sprite" class="avatar-sprite pet-bobbing-50">
+        <img id="avatar-img" src="/pets/einstein/spritesheet.webp" alt="Mascota">
+      </div>
+    </div>
+
+    <!-- Botonera de acción idéntica a la PC -->
+    <div class="fila-botones-mascota">
+      <button id="btn-pausa-5m" class="btn-pet btn-pausa" type="button" title="Pausar o sumar 5 min">
+        <span class="btn-pet-icon">⏸</span>
+        <span class="btn-pet-txt">+5m</span>
+      </button>
+      <button id="btn-voz" class="btn-pet btn-mic" type="button" title="Hablar con la mascota">
+        <span class="btn-pet-icon">🎤</span>
+      </button>
+      <button id="btn-seguir-5m" class="btn-pet btn-seguir" type="button" title="Seguir o sumar 5 min foco">
+        <span class="btn-pet-icon">▶</span>
+        <span class="btn-pet-txt">+5m</span>
+      </button>
+    </div>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="widget-mascota.js"></script>
+</body>
+</html>

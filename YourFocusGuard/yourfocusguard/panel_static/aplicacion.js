@@ -263,6 +263,7 @@ $("#guardar").addEventListener("click", async () => {
       mascota: {
         visible: $("#mascota-visible").checked,
         tema: $("#mascota-tema").value,
+        destino: $("#mascota-destino") ? $("#mascota-destino").value : "ambos",
       },
       concentracion: {
         habilitado: $("#concentracion-activa").checked,
@@ -560,6 +561,9 @@ function aplicarConfig(cfg, esDescarte = false) {
     selectTema.appendChild(opt);
   });
   $("#mascota-visible").checked = cfg.mascota_visible !== false;
+  if ($("#mascota-destino")) {
+    $("#mascota-destino").value = cfg.mascota_destino || "ambos";
+  }
 
   // concentración
   $("#concentracion-activa").checked = cfg.concentracion_habilitada === true;

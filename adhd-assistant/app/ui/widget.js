@@ -7,8 +7,17 @@ const $ = (sel) => document.querySelector(sel);
 
 /* ---------------- Utilidades ---------------- */
 
+const tokenUrl = new URLSearchParams(window.location.search).get("t") || "";
+
 async function api(metodo, ruta, cuerpo) {
   const opciones = { method: metodo, headers: {} };
+  if (tokenUrl) {
+    if (!ruta.includes("?")) {
+      ruta += "?t=" + encodeURIComponent(tokenUrl);
+    } else if (!ruta.includes("t=")) {
+      ruta += "&t=" + encodeURIComponent(tokenUrl);
+    }
+  }
   if (cuerpo !== undefined) {
     opciones.headers["Content-Type"] = "application/json";
     opciones.body = JSON.stringify(cuerpo);
@@ -18,7 +27,7 @@ async function api(metodo, ruta, cuerpo) {
     const datos = await resp.json().catch(() => ({}));
     return { ok: resp.ok, estado: resp.status, datos };
   } catch (e) {
-    return { ok: false, estado: 0, datos: {} };
+    return { ok: false, estado: 0, err: e.message || String(e), datos: {} };
   }
 }
 
@@ -54,8 +63,12 @@ async function verificarEstado() {
 async function cargarBriefing() {
   const caja = $("#briefing");
   caja.textContent = "Calculando...";
-  const { ok, datos } = await api("GET", "/api/briefing");
-  caja.textContent = ok && datos.texto ? datos.texto : "No pude calcular el briefing (¿el servidor está corriendo?).";
+  const res = await api("GET", "/api/briefing");
+  if (!res.ok) {
+    caja.textContent = "Error " + res.estado + ": " + (res.err || JSON.stringify(res.datos));
+    return;
+  }
+  caja.textContent = res.datos && res.datos.texto ? res.datos.texto : "Sin texto";
 }
 
 /* ---------------- Alarmas ---------------- */

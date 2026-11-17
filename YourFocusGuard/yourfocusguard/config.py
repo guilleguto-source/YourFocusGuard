@@ -159,9 +159,10 @@ class MascotaCfg:
     """Sección [mascota]: la guardiana de escritorio (v0.3.0)."""
 
     visible: bool = True
-    tema: str = "clasico"           #TEMAS en mascota.py: clasico | oscuro | calido
+    tema: str = "clasico"           # TEMAS en mascota.py: clasico | oscuro | calido
     posicion: str = "inferior_derecha"  # inferior_derecha | inferior_izquierda
     ancho: int = 150                # tamaño del lienzo en px
+    destino: str = "ambos"          # pc | celular | ambos
 
 
 @dataclass

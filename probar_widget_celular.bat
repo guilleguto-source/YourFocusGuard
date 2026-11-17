@@ -15,7 +15,9 @@ if %ERRORLEVEL% equ 0 (
     adb reverse tcp:8765 tcp:8765 >nul 2>nul
     if %ERRORLEVEL% equ 0 (
         echo  --^> Enlace USB detectado: 'adb reverse tcp:8765 tcp:8765' ACTIVO.
-        echo  --^> En el celular puedes abrir directamente: http://localhost:8765/widget
+        echo  --^> En el celular puedes abrir:
+        echo       • Panel de Tareas:   http://localhost:8765/widget
+        echo       • Mascota Dedicada:  http://localhost:8765/widget-mascota
     ) else (
         echo  --^> ADB disponible pero sin telefono conectado por cable (o sin depuracion USB).
     )

@@ -44,6 +44,7 @@ _PET_STATE = {
     "reaccion": "idle",
     "burbuja": {"texto": "", "opciones": [], "duracion": 4000},
     "respuestas": [],
+    "destino": "ambos",
 }
 
 
@@ -82,6 +83,11 @@ def pet_fijar_reaccion(reaccion: str) -> None:
 def pet_fijar_mascota(nombre: str) -> None:
     with _PET_LOCK:
         _PET_STATE["mascota"] = str(nombre or "null-wisp").strip()
+
+
+def pet_fijar_destino(destino: str) -> None:
+    with _PET_LOCK:
+        _PET_STATE["destino"] = str(destino or "ambos").strip().lower()
 
 
 def pet_decir(texto: str, reaccion: str | None = None, opciones: list[str] | None = None, duracion_ms: int = 4000, auto_confirmar_seg: int = 0) -> None:
@@ -231,6 +237,7 @@ def payload_estado(cfg: Config) -> dict:
             "refuerzo_intervalo_min": fresca.alertas.refuerzo_intervalo_min,
             "mascota_visible": fresca.mascota.visible,
             "mascota_tema": fresca.mascota.tema,
+            "mascota_destino": getattr(fresca.mascota, "destino", "ambos"),
             "avatar_proveedor": fresca.avatar.proveedor,
             "temas": list(TEMAS_MASCOTA),
             "camara_habilitada": fresca.camara.habilitada,
@@ -394,6 +401,11 @@ def construir_overlay(payload: dict) -> dict:
             if tema not in TEMAS_MASCOTA:
                 raise ValueError(f"tema inválido: {tema!r}")
             seccion["tema"] = tema
+        if "destino" in ma:
+            dest = str(ma["destino"]).strip().lower()
+            if dest in ("pc", "celular", "ambos"):
+                seccion["destino"] = dest
+                pet_fijar_destino(dest)
         if seccion:
             overlay["mascota"] = seccion
 

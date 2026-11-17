@@ -49,6 +49,34 @@ header {
   background: var(--peligro);
   transition: background 0.3s;
 }
+
+/* ---------- Pestañas de Navegación ---------- */
+.nav-pestañas {
+  display: flex;
+  gap: 8px;
+  background: var(--tarjeta);
+  border: 1px solid var(--tarjeta-borde);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 12px;
+}
+
+.pestaña {
+  flex: 1;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.pestaña.activa {
+  background: var(--acento);
+  color: #ffffff;
+}
 .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 
 /* ---------- Tarjetas ---------- */

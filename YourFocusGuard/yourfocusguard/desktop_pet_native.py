@@ -599,6 +599,14 @@ class MascotaFlotanteNativa:
             req = urllib.request.Request(url, headers={"User-Agent": "YFG-PetNative"})
             with urllib.request.urlopen(req, timeout=0.8) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
+                destino = str(data.get("destino", "ambos")).strip().lower()
+                if destino == "celular":
+                    if self.root.state() != "withdrawn":
+                        self.root.withdraw()
+                else:
+                    if self.root.state() == "withdrawn":
+                        self.root.deiconify()
+
                 nueva_mascota = data.get("mascota")
                 if nueva_mascota and nueva_mascota != self.mascota_id:
                     self._cargar_mascota(nueva_mascota)

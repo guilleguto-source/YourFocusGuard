@@ -1,32 +1,36 @@
-# Plan: Aplicación de Endurecimiento v0.12.1 y Aislamiento del Widget Móvil
+# Plan: Doble Widget Móvil (Panel Tareas + Mascota Móvil) y Selector de Destino
 
 ## Contexto
-El usuario requiere aplicar todas las correcciones de estabilidad y seguridad de la auditoría (v0.12.1) al sistema principal, manteniendo la integración del celular / widget (proveniente de `1e73d4dd-031d-4224-bc5a-58c5d57b580c` / PhoneBox) de manera aislada y modular para probarlo por separado sin comprometer el funcionamiento actual.
+El usuario desea conservar el widget táctil actual (tareas, alarmas, briefing) y añadir un **segundo widget dedicado a la mascota** para el celular (Nubia Z17 Lite). La mascota tendrá sus botones (+5m, mic, seguir, burbuja), un tamaño fijo adaptado a la pantalla del móvil y una animación con 50% de movimiento del original. Además, en el dashboard de la PC se podrá elegir el destino de la mascota: solo PC, solo celular o ambos.
 
-## Estrategia de Segregación
-1. **Fase 1: Núcleo y Endurecimiento (Producción Estable)**:
-   - Aplicar correcciones de hosts y volumen exacto en `YourFocusGuard/yourfocusguard/actions/concentracion.py`.
-   - Aplicar límites de seguridad en `adhd-assistant` (body 64KB, anti DNS-rebinding, "anota que..." incondicional, validación tipada, cancelación de alarmas en `timer.py`).
-   - Servidor por defecto estrictamente atado a `127.0.0.1` (localhost puro).
-2. **Fase 2: Aislamiento del Widget / Celular (Módulo Separado)**:
-   - Los archivos de interfaz móvil (`widget.html`, `widget.js`, `widget.css`) se integran como endpoint pasivo `/widget` (sin exponer puertos ni alterar el panel web principal).
-   - Crear script aislado `probar_widget_celular.bat` (o subcomando) para probar el enlace con el Nubia (sea por USB `adb reverse` o red) de forma controlada sin tocar la configuración de inicio silencioso del sistema principal.
+## Arquitectura de los 2 Widgets
+1. **Widget 1 (Panel Productivo)**: `http://localhost:8765/widget`
+   - Conserva la vista actual: reloj, briefing, alarmas rápidas, tareas y notas.
+   - Pestaña/botón superior para alternar con la mascota.
+2. **Widget 2 (Mascota Móvil)**: `http://localhost:8765/widget-mascota`
+   - Vista dedicada y limpia de la mascota activa (Einstein u otra elegida en settings).
+   - Animación viva con 50% de movimiento (CSS bobbing suave).
+   - Barra de control idéntica a la PC: `[ ⏸ +5m ]`, `[ 🎤 ]`, `[ ▶ +5m ]`.
+   - Burbuja reactiva a preguntas y desvíos (`[ Sigo aquí ]`, `[ Pausa 10m ]`, `[ Leyendo ]`).
+   - Pestaña superior para volver al panel productivo.
+3. **Selector de Destino en Dashboard (`panel_static/index.html`)**:
+   - Ajuste: "Mostrar mascota en": `🖥️ Pantalla de la PC` | `📱 Celular` | `🖥️📱 Ambos`.
+   - Controla si `desktop_pet_native.py` se muestra/oculta en Windows sin afectar el servicio del celular.
 
 ## Archivos Afectados
-- `YourFocusGuard/yourfocusguard/actions/concentracion.py` (hosts block + journal + volume DWORD)
-- `YourFocusGuard/tests/test_concentracion_v085.py` (pruebas regresión guardián)
-- `YourFocusGuard/requirements-lock.txt` y `CHANGELOG.md`
-- `adhd-assistant/app/server.py` (endurecimiento HTTP + endpoint pasivo widget)
-- `adhd-assistant/app/router.py` (captura directa de notas)
-- `adhd-assistant/app/timer.py` (cancelación de alarmas)
-- `adhd-assistant/app/ui/widget.*` (archivos estáticos aislados del celular)
-- `adhd-assistant/pruebas_automaticas.py` (suite ampliada a 120 pruebas)
-- `adhd-assistant/requirements-lock.txt`
-- `probar_widget_celular.bat` (lanzador independiente para testing de móvil)
+- `adhd-assistant/app/ui/widget-mascota.html` (nuevo: UI dedicada de la mascota para el celular)
+- `adhd-assistant/app/ui/widget-mascota.css` (nuevo: estilos, escala fija y keyframes 50% movimiento)
+- `adhd-assistant/app/ui/widget-mascota.js` (nuevo: polling de estado, burbuja y control de acciones)
+- `adhd-assistant/app/ui/widget.html` (navegación para alternar entre Panel y Mascota)
+- `adhd-assistant/app/server.py` (ruta `/widget-mascota` y proxy/sync de estado con YourFocusGuard)
+- `YourFocusGuard/yourfocusguard/panel_static/index.html` (selector de destino de mascota en Dashboard)
+- `YourFocusGuard/yourfocusguard/panel_static/aplicacion.js` (persistencia del selector y control de ventana PC)
+- `YourFocusGuard/yourfocusguard/config.py` y `config/user.toml` (campo `destino_mascota: "pc" | "celular" | "ambos"`)
 
-## Checklist de Ejecución
-- [ ] 1. Descomprimir e integrar cambios de endurecimiento de `asistente_v0121_endurecimiento_widget.zip` sobre el código fuente.
-- [ ] 2. Garantizar que el modo por defecto de `server.py` opere estrictamente en localhost sin exigir token a clientes locales.
-- [ ] 3. Crear script de prueba dedicado `probar_widget_celular.bat` para verificar el Nubia Z17 Lite sin alterar los lanzadores silenciosos.
-- [ ] 4. Ejecutar suites de verificación: `pytest YourFocusGuard/tests` (293 tests) y `python adhd-assistant/pruebas_automaticas.py` (120 tests).
-- [ ] 5. Confirmar estado limpio en Git y documentar procedimiento de prueba aislada.
+## Checklist de Implementación
+- [ ] 1. Crear `widget-mascota.html/.css/.js` en `adhd-assistant/app/ui/` con escala óptima y animación viva 50%.
+- [ ] 2. Añadir ruta `/widget-mascota` en `server.py` sirviendo los assets y comunicando eventos con el puerto 8756.
+- [ ] 3. Añadir barra de navegación simple `[ 📱 Panel ] [ 🐶 Mascota ]` en ambos widgets.
+- [ ] 4. Añadir selector "Mostrar mascota en" en `index.html` del panel de settings.
+- [ ] 5. Ajustar lógica en `desktop_pet_native.py` para ocultar la ventana en Windows si el destino es "solo celular".
+- [ ] 6. Validar pruebas unitarias y funcionamiento de ambos widgets.

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Agent Sessions</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0b0f19;
+      color: #f1f5f9;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      display: flex;
+      flex-direction: row;
+      gap: 12px;
+      padding: 12px;
+    }
+    .card {
+      background: rgba(18, 24, 38, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .card-sessions { flex: 7; }
+    .card-inspector { flex: 5; }
+
+    .header {
+      padding: 12px 14px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .tabs { display: flex; gap: 8px; align-items: center; }
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .tab-btn.active {
+      background: rgba(45, 212, 191, 0.15);
+      border-color: #2dd4bf;
+      color: #2dd4bf;
+    }
+    .tab-btn.deepseek.active {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: #3b82f6;
+      color: #60a5fa;
+    }
+    .subhead {
+      font-size: 10px;
+      color: #64748b;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .content-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .content-list::-webkit-scrollbar { width: 4px; }
+    .content-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+
+    .session-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .session-item:hover, .session-item.selected {
+      background: rgba(45, 212, 191, 0.08);
+      border-color: rgba(45, 212, 191, 0.3);
+    }
+    .session-item.working {
+      background: rgba(45, 212, 191, 0.05);
+      border-left: 3px solid #2dd4bf;
+    }
+    .session-item.idle {
+      border-left: 3px solid #64748b;
+    }
+
+    .item-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow: hidden;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.working {
+      background: #2dd4bf;
+      box-shadow: 0 0 8px #2dd4bf;
+      animation: pulse 1.8s infinite;
+    }
+    .dot.idle { background: #64748b; }
+    .dot.deepseek { background: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
+    @keyframes pulse {
+      0% { opacity: 0.6; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.6; transform: scale(0.9); }
+    }
+
+    .item-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+    .item-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #64748b;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-working { background: rgba(45, 212, 191, 0.15); color: #2dd4bf; }
+    .badge-idle { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
+    .badge-ds { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+
+    /* Panel Inspector */
+    .inspector-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .active-badge-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .engine-pill {
+      font-size: 11px;
+      font-weight: 700;
+      color: #2dd4bf;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: rgba(45, 212, 191, 0.15);
+      color: #2dd4bf;
+    }
+    .goal-box {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .goal-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+    .goal-val { font-size: 13px; font-weight: 600; color: #f8fafc; line-height: 1.3; }
+
+    .step-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .metric-card .num { font-size: 18px; font-weight: 700; color: #f1f5f9; font-variant-numeric: tabular-nums; }
+    .metric-card .lbl { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+    .action-box {
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid #2dd4bf;
+      border-radius: 4px 8px 8px 4px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .action-box.idle { border-color: #64748b; }
+    .action-text { font-size: 11px; color: #cbd5e1; }
+
+    .plan-alert {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Izquierda: Lista de Sesiones -->
+  <div class="card card-sessions">
+    <div class="header">
+      <div class="tabs">
+        <button class="tab-btn active" id="tabAgy" onclick="cambiarTab('agy')">
+          <span>✦</span> Antigravity <span id="countAgy" style="opacity:0.7;"></span>
+        </button>
+        <button class="tab-btn deepseek" id="tabDs" onclick="cambiarTab('ds')">
+          <span>◎</span> DeepSeek Harness <span id="countDs" style="opacity:0.7;"></span>
+        </button>
+      </div>
+      <div class="subhead" id="subStatus">Cargando...</div>
+    </div>
+    <div class="content-list" id="listaSesiones"></div>
+  </div>
+
+  <!-- Derecha: Inspector en Vivo -->
+  <div class="card card-inspector">
+    <div class="header">
+      <div class="subhead">INSPECTOR EN VIVO</div>
+      <div class="engine-pill" id="inspEngine">✦ Antigravity 2.0</div>
+    </div>
+    <div class="inspector-body" id="inspectorBody">
+      <div class="active-badge-bar">
+        <span class="status-pill" id="inspStatus">ONLINE</span>
+        <span style="font-size:10px; color:#64748b;" id="inspUpdated">Hace instantes</span>
+      </div>
+
+      <div class="goal-box">
+        <div class="goal-lbl" id="inspGoalLbl">Conversación Activa</div>
+        <div class="goal-val" id="inspGoalVal">Cargando...</div>
+      </div>
+
+      <div class="step-box">
+        <div class="metric-card">
+          <div class="num" id="inspSteps">–</div>
+          <div class="lbl">Pasos / Turnos</div>
+        </div>
+        <div class="metric-card">
+          <div class="num" id="inspTool">–</div>
+          <div class="lbl">Herramienta Actual</div>
+        </div>
+      </div>
+
+      <div class="action-box" id="inspActionBox">
+        <span class="dot working" id="inspActionDot"></span>
+        <div class="action-text" id="inspActionDetail">En ejecución</div>
+      </div>
+
+      <div class="plan-alert" id="inspPlanAlert" style="display:none;">
+        <span>⚠️</span> Requiere confirmación de plan
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeTab = 'agy';
+    let globalData = null;
+
+    function cambiarTab(tab) {
+      activeTab = tab;
+      document.getElementById('tabAgy').classList.toggle('active', tab === 'agy');
+      document.getElementById('tabDs').classList.toggle('active', tab === 'ds');
+      render();
+    }
+
+    async function fetchData() {
+      try {
+        const host = location.hostname || '127.0.0.1';
+        const res = await fetch(`http://${host}:8770/api/agents/state`);
+        if (res.ok) {
+          globalData = await res.json();
+          render();
+        }
+      } catch (e) {
+        document.getElementById('subStatus').textContent = 'Reconectando...';
+      }
+    }
+
+    function render() {
+      if (!globalData) return;
+      const agy = globalData.antigravity || {};
+      const ds = globalData.deepseek || {};
+
+      document.getElementById('countAgy').textContent = `(${agy.sessions ? agy.sessions.length : 0})`;
+      document.getElementById('countDs').textContent = `(${ds.dossiers ? ds.dossiers.length : 0})`;
+
+      const lista = document.getElementById('listaSesiones');
+      lista.innerHTML = '';
+
+      if (activeTab === 'agy') {
+        const sesiones = agy.sessions || [];
+        const workingCount = sesiones.filter(s => s.status === 'working').length;
+        document.getElementById('subStatus').textContent = `${workingCount} activo · ${sesiones.length - workingCount} en espera`;
+
+        sesiones.forEach(s => {
+          const item = document.createElement('div');
+          item.className = `session-item ${s.status}`;
+          item.innerHTML = `
+            <div class="item-left">
+              <span class="dot ${s.status}"></span>
+              <span class="item-title" title="${s.title}">${s.title}</span>
+            </div>
+            <div class="item-meta">
+              <span>${s.steps} turnos</span>
+              <span>·</span>
+              <span>${s.updated}</span>
+            </div>
+          `;
+          lista.appendChild(item);
+        });
+
+        // Inspector para Antigravity
+        document.getElementById('inspEngine').textContent = '✦ Antigravity 2.0';
+        document.getElementById('inspEngine').style.color = '#2dd4bf';
+        document.getElementById('inspStatus').textContent = agy.status.toUpperCase();
+        document.getElementById('inspGoalLbl').textContent = 'Conversación Activa';
+        document.getElementById('inspGoalVal').textContent = (agy.active_session && agy.active_session.title) || 'En espera';
+        document.getElementById('inspSteps').textContent = (agy.live_step && agy.live_step.step_index) || (agy.active_session ? agy.active_session.steps : '0');
+        document.getElementById('inspTool').textContent = (agy.live_step && agy.live_step.current_tool) || '–';
+        document.getElementById('inspActionDetail').textContent = (agy.live_step && agy.live_step.action_detail) || 'Completado';
+        
+        const isWorking = agy.active_session && agy.active_session.status === 'working';
+        document.getElementById('inspActionBox').className = `action-box ${isWorking ? '' : 'idle'}`;
+        document.getElementById('inspActionDot').className = `dot ${isWorking ? 'working' : 'idle'}`;
+        document.getElementById('inspUpdated').textContent = agy.active_session ? agy.active_session.updated : '';
+        document.getElementById('inspPlanAlert').style.display = (agy.live_step && agy.live_step.has_pending_plan) ? 'flex' : 'none';
+
+      } else {
+        // Pestaña DeepSeek Harness
+        const dossiers = ds.dossiers || [];
+        document.getElementById('subStatus').textContent = `${dossiers.length} dossiers · workspace: ${ds.active_workspace || 'default'}`;
+
+        if (!dossiers.length) {
+          lista.innerHTML = '<div style="padding:16px;color:#64748b;font-size:12px;text-align:center;">No hay dossiers activos en el workspace</div>';
+        } else {
+          dossiers.forEach(d => {
+            const item = document.createElement('div');
+            item.className = 'session-item';
+            item.innerHTML = `
+              <div class="item-left">
+                <span class="dot deepseek"></span>
+                <span class="item-title" title="${d.name}">${d.name}</span>
+              </div>
+              <div class="item-meta">
+                <span class="badge badge-ds">${d.workspace}</span>
+                <span>·</span>
+                <span>${d.updated}</span>
+              </div>
+            `;
+            lista.appendChild(item);
+          });
+        }
+
+        // Inspector para DeepSeek
+        document.getElementById('inspEngine').textContent = '◎ DeepSeek Harness';
+        document.getElementById('inspEngine').style.color = '#60a5fa';
+        document.getElementById('inspStatus').textContent = ds.status.toUpperCase();
+        document.getElementById('inspGoalLbl').textContent = 'Workspace Activo';
+        document.getElementById('inspGoalVal').textContent = ds.active_workspace || 'default-workspace';
+        document.getElementById('inspSteps').textContent = dossiers.length;
+        document.getElementById('inspTool').textContent = 'Dossiers';
+        document.getElementById('inspActionDetail').textContent = `Documentos listos en ${ds.active_workspace}`;
+        document.getElementById('inspActionBox').className = 'action-box';
+        document.getElementById('inspActionDot').className = 'dot deepseek';
+        document.getElementById('inspPlanAlert').style.display = 'none';
+      }
+    }
+
+    fetchData();
+    setInterval(fetchData, 2500);
+  </script>
+</body>
+</html>
