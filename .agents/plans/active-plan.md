@@ -1,36 +1,34 @@
-# Plan: Doble Widget Móvil (Panel Tareas + Mascota Móvil) y Selector de Destino
+# Plan: Selector de Perfiles de Trabajo Móvil (Edición de Fotos / Vibe Coding)
 
 ## Contexto
-El usuario desea conservar el widget táctil actual (tareas, alarmas, briefing) y añadir un **segundo widget dedicado a la mascota** para el celular (Nubia Z17 Lite). La mascota tendrá sus botones (+5m, mic, seguir, burbuja), un tamaño fijo adaptado a la pantalla del móvil y una animación con 50% de movimiento del original. Además, en el dashboard de la PC se podrá elegir el destino de la mascota: solo PC, solo celular o ambos.
+El usuario requiere que en el widget móvil del celular (Nubia Z17 Lite), al presionar "Iniciar Trabajo", se desplieguen directamente sus dos perfiles principales:
+1. **📸 Editar Fotos**: Lightroom, Lightroom Classic, Photoshop (aux: Explorer, Bridge).
+2. **💻 Vibe Coding**: VS Code, Cursor, Windsurf, Antigravity, Terminales (aux: Navegadores).
 
-## Arquitectura de los 2 Widgets
-1. **Widget 1 (Panel Productivo)**: `http://localhost:8765/widget`
-   - Conserva la vista actual: reloj, briefing, alarmas rápidas, tareas y notas.
-   - Pestaña/botón superior para alternar con la mascota.
-2. **Widget 2 (Mascota Móvil)**: `http://localhost:8765/widget-mascota`
-   - Vista dedicada y limpia de la mascota activa (Einstein u otra elegida en settings).
-   - Animación viva con 50% de movimiento (CSS bobbing suave).
-   - Barra de control idéntica a la PC: `[ ⏸ +5m ]`, `[ 🎤 ]`, `[ ▶ +5m ]`.
-   - Burbuja reactiva a preguntas y desvíos (`[ Sigo aquí ]`, `[ Pausa 10m ]`, `[ Leyendo ]`).
-   - Pestaña superior para volver al panel productivo.
-3. **Selector de Destino en Dashboard (`panel_static/index.html`)**:
-   - Ajuste: "Mostrar mascota en": `🖥️ Pantalla de la PC` | `📱 Celular` | `🖥️📱 Ambos`.
-   - Controla si `desktop_pet_native.py` se muestra/oculta en Windows sin afectar el servicio del celular.
+## Arquitectura de Solución
+1. **Selector de Perfiles en `widget-mascota.html/.js`**:
+   - **Estado Inactivo**: Botón `[ 🚀 Iniciar Trabajo ]` que al tocarse despliega modal/selector táctil:
+     - Opción A: `[ 📸 Editar Fotos ]`
+     - Opción B: `[ 💻 Vibe Coding ]`
+   - **Inicio de Sesión**: Envío a `/api/control` de `cmd: "session_start"` con `apps`, `aux` y `texto` específicos del perfil seleccionado.
+   - **Estado Activo**: Chip/barra superior: `🟢 <Perfil Activo> · [ ⏹ Cerrar Sesión ]`.
+   - **Feedback de Mascota**: Burbuja de diálogo reactiva confirmando el perfil iniciado.
+2. **Control de Voz y Estado 8756**:
+   - Feedback táctil e interactivo en pantalla al tocar `[ 🎤 ]`.
+   - Conexión continua asegurada entre 8770 y 8756.
+
+## Perfiles Predefinidos
+- `perfil_fotos`: `texto: "Edición de Fotos"`, `apps: ["lightroom", "lightroomclassic", "photoshop"]`, `aux: ["explorer", "bridge"]`.
+- `perfil_coding`: `texto: "Vibe Coding"`, `apps: ["code", "cursor", "windsurf", "antigravity", "terminal", "powershell", "cmd"]`, `aux: ["chrome", "brave", "edge", "firefox"]`.
 
 ## Archivos Afectados
-- `adhd-assistant/app/ui/widget-mascota.html` (nuevo: UI dedicada de la mascota para el celular)
-- `adhd-assistant/app/ui/widget-mascota.css` (nuevo: estilos, escala fija y keyframes 50% movimiento)
-- `adhd-assistant/app/ui/widget-mascota.js` (nuevo: polling de estado, burbuja y control de acciones)
-- `adhd-assistant/app/ui/widget.html` (navegación para alternar entre Panel y Mascota)
-- `adhd-assistant/app/server.py` (ruta `/widget-mascota` y proxy/sync de estado con YourFocusGuard)
-- `YourFocusGuard/yourfocusguard/panel_static/index.html` (selector de destino de mascota en Dashboard)
-- `YourFocusGuard/yourfocusguard/panel_static/aplicacion.js` (persistencia del selector y control de ventana PC)
-- `YourFocusGuard/yourfocusguard/config.py` y `config/user.toml` (campo `destino_mascota: "pc" | "celular" | "ambos"`)
+- `adhd-assistant/app/ui/widget-mascota.html`: contenedor selector de perfiles y barra de sesión activa.
+- `adhd-assistant/app/ui/widget-mascota.css`: estilos de tarjetas/botones táctiles de perfiles y chip de estado.
+- `adhd-assistant/app/ui/widget-mascota.js`: lógica de selección de perfil, envío de `session_start` / `session_stop` y polling de estado de sesión.
 
 ## Checklist de Implementación
-- [ ] 1. Crear `widget-mascota.html/.css/.js` en `adhd-assistant/app/ui/` con escala óptima y animación viva 50%.
-- [ ] 2. Añadir ruta `/widget-mascota` en `server.py` sirviendo los assets y comunicando eventos con el puerto 8756.
-- [ ] 3. Añadir barra de navegación simple `[ 📱 Panel ] [ 🐶 Mascota ]` en ambos widgets.
-- [ ] 4. Añadir selector "Mostrar mascota en" en `index.html` del panel de settings.
-- [ ] 5. Ajustar lógica en `desktop_pet_native.py` para ocultar la ventana en Windows si el destino es "solo celular".
-- [ ] 6. Validar pruebas unitarias y funcionamiento de ambos widgets.
+- [ ] 1. Diseñar componente selector de perfiles táctil en `widget-mascota.html`.
+- [ ] 2. Añadir estilos responsivos en `widget-mascota.css` para botones de perfil y barra de sesión activa.
+- [ ] 3. Programar lógica de activación por perfil (`fotos` vs `coding`) en `widget-mascota.js` conectada a `/api/control`.
+- [ ] 4. Sincronizar estado de sesión en tiempo real (mostrar perfil activo y botón para finalizar).
+- [ ] 5. Probar y verificar en el puerto 8770 / widget móvil.

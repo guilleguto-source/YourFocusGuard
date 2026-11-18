@@ -449,7 +449,6 @@ def cmd_status(args) -> int:
         resumen = db.resumen_hoy()
         recientes = db.eventos_recientes(6)
         presupuesto = db.presupuesto_hoy()
-        db.cerrar()
 
         print("  " + "-" * 58)
         print("  Hoy:")
@@ -488,6 +487,7 @@ def cmd_status(args) -> int:
                     f"    {hora}  {fila['estado']:<9} {fila['tipo']:<9} "
                     f"{fila['accion'] or '':<7} {str(detalle)[:34]}"
                 )
+        db.cerrar()
     print()
     return 0
 

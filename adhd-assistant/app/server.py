@@ -10,9 +10,11 @@ except Exception:
     pass
 
 import json
+import re
 import logging
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import urllib.parse
+import urllib.request
 from typing import Any
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +44,7 @@ audio_engine = AudioEngine()
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PETS_DIR = os.path.join(ROOT_DIR, "YourFocusGuard", "yourfocusguard", "panel_static", "pets")
+BESZEL_URL = os.getenv("BESZEL_URL", "http://192.168.1.20:8090")
 YFG_PORT = int(os.getenv("YFG_PUERTO", "8756"))
 YFG_URL = f"http://127.0.0.1:{YFG_PORT}"
 
@@ -60,6 +63,8 @@ ORIGENES_PERMITIDOS = {
     "http://127.0.0.1:8765",
     "http://localhost:8766",
     "http://127.0.0.1:8766",
+    "https://appassets.androidplatform.net",
+    "null",
 }
 
 # ---------------------------------------------------------------------
@@ -71,6 +76,7 @@ ORIGENES_PERMITIDOS = {
 MAX_CUERPO_BYTES = 64 * 1024
 
 ARCHIVO_SESION = os.path.join(BASE_DIR, "data", "sesion_token.json")
+ARCHIVO_BESZEL_AUTH = os.path.join(BASE_DIR, "data", "beszel_auth.json")
 
 
 def _token_sesion() -> str:
@@ -209,11 +215,13 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
     def _acceso_ok(self, parsed, url_path: str) -> bool:
         """Autorización unificada (v0.12.1).
 
-        - Loopback (esta PC): como antes — la API exige Origin válido si el
-          navegador lo envía; los estáticos quedan libres.
-        - Cliente remoto (celular por LAN, modo widget): exige el token
-          emparejado en TODO (API y archivos estáticos).
+        - Token válido: acceso concedido sin importar origen ni cliente.
+        - Loopback (esta PC): la API exige Origin permitido si el navegador lo envía;
+          los estáticos quedan libres.
+        - Cliente remoto sin token: denegado.
         """
+        if self._token_valido(parsed):
+            return True
         if self._cliente_local():
             if url_path.startswith("/api/"):
                 origin = self.headers.get("Origin")
@@ -221,7 +229,7 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
                     return True
                 return origin in _ORIGENES_PERMITIDOS
             return True
-        return self._token_valido(parsed)
+        return False
 
     def _rechazar_origen(self):
         self.send_response(403)
@@ -322,6 +330,129 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         self._proxy_a_yfg(parsed)
 
+    def _proxy_beszel(self, parsed, method="GET", post_data=None):
+        if parsed.path.startswith("/beszel"):
+            rel_path = parsed.path[len("/beszel"):]
+            if not rel_path:
+                rel_path = "/"
+        else:
+            rel_path = parsed.path
+
+        # SPA Fallback: todas las rutas HTML sirven index.html upstream
+        is_html_route = method == "GET" and not any(rel_path.startswith(p) for p in ("/assets/", "/static/", "/api/"))
+        if is_html_route:
+            upstream_url = f"{BESZEL_URL}/"
+        else:
+            upstream_url = f"{BESZEL_URL}{rel_path}"
+            if parsed.query:
+                upstream_url += f"?{parsed.query}"
+
+        req_headers = {}
+        for h in ["Content-Type", "Authorization", "Cookie", "Accept", "Accept-Language", "User-Agent"]:
+            val = self.headers.get(h)
+            if val:
+                req_headers[h] = val
+        req_headers["Host"] = "192.168.1.20:8090"
+
+        if "Authorization" not in req_headers and os.path.isfile(ARCHIVO_BESZEL_AUTH):
+            try:
+                with open(ARCHIVO_BESZEL_AUTH, "r", encoding="utf-8") as f:
+                    ac = json.load(f)
+                if "token" in ac:
+                    req_headers["Authorization"] = ac["token"]
+            except Exception:
+                pass
+
+        req = urllib.request.Request(upstream_url, data=post_data, headers=req_headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = resp.read()
+                content_type = resp.headers.get("Content-Type", "text/html")
+                if "text/html" in content_type:
+                    html_str = data.decode("utf-8", errors="replace")
+                    html_str = re.sub(
+                        r'globalThis\.BESZEL\s*=\s*\{.*?\}',
+                        'globalThis.BESZEL = {"BASE_PATH":"/beszel/","HUB_VERSION":"0.21.1","HUB_URL":""}',
+                        html_str
+                    )
+                    html_str = html_str.replace('src="/assets/', 'src="/beszel/assets/')
+                    html_str = html_str.replace('href="/assets/', 'href="/beszel/assets/')
+                    html_str = html_str.replace('href="/static/', 'href="/beszel/static/')
+                    html_str = html_str.replace('src="/static/', 'src="/beszel/static/')
+                    auth_json = '""'
+                    if os.path.isfile(ARCHIVO_BESZEL_AUTH):
+                        try:
+                            with open(ARCHIVO_BESZEL_AUTH, "r", encoding="utf-8") as f:
+                                ac = json.load(f)
+                            if "token" in ac:
+                                auth_json = json.dumps(json.dumps({"token": ac["token"], "record": ac.get("record", {})}))
+                        except Exception:
+                            pass
+
+                    polyfill = (
+                        '<script>'
+                        'if(location.pathname.endsWith("/login")||location.pathname.endsWith("/login/")){history.replaceState(null,"","/beszel/");}'
+                        f'var _mem={{"ui-theme":"dark","pocketbase_auth":{auth_json}}};'
+                        'globalThis._safeStorage={'
+                        'getItem:function(k){return Object.prototype.hasOwnProperty.call(_mem,k)?_mem[k]:null;},'
+                        'setItem:function(k,v){_mem[k]=String(v);},'
+                        'removeItem:function(k){delete _mem[k];},'
+                        'clear:function(){_mem={};},'
+                        'key:function(i){return Object.keys(_mem)[i]||null;},'
+                        'get length(){return Object.keys(_mem).length;}'
+                        '};'
+                        'try{Object.defineProperty(window,"localStorage",{value:globalThis._safeStorage,configurable:true,writable:true});}catch(e){}'
+                        'try{Object.defineProperty(window,"sessionStorage",{value:globalThis._safeStorage,configurable:true,writable:true});}catch(e){}'
+                        '</script>'
+                        '<style>'
+                        'html,body{background:#0e1220!important;color:#fff!important;overflow-x:hidden!important;}'
+                        'div.container:not(.relative){display:none!important;}'
+                        'div.container.relative>div:first-child>div:first-child{display:none!important;}'
+                        'div.container.relative{padding:0!important;max-width:100%!important;}'
+                        'div.container.relative>div:first-child{border:none!important;padding:4px!important;background:transparent!important;box-shadow:none!important;}'
+                        '.grid.gap-4{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;}'
+                        '</style>'
+                    )
+                    html_str = html_str.replace("<head>", f"<head>{polyfill}")
+                    data = html_str.encode("utf-8")
+                elif "javascript" in content_type or rel_path.endswith(".js"):
+                    js_str = data.decode("utf-8", errors="replace")
+                    js_str = js_str.replace("window?.localStorage", "globalThis._safeStorage")
+                    js_str = js_str.replace("window.localStorage", "globalThis._safeStorage")
+                    js_str = js_str.replace("globalThis.localStorage", "globalThis._safeStorage")
+                    js_str = re.sub(r'\blocalStorage\b', 'globalThis._safeStorage', js_str)
+                    js_str = re.sub(r'\bsessionStorage\b', 'globalThis._safeStorage', js_str)
+                    data = js_str.encode("utf-8")
+
+                if "/auth-with-password" in parsed.path and method == "POST":
+                    try:
+                        auth_data = json.loads(data.decode("utf-8"))
+                        if "token" in auth_data:
+                            with open(ARCHIVO_BESZEL_AUTH, "w", encoding="utf-8") as f:
+                                json.dump(auth_data, f, indent=2)
+                            logger.info("Beszel: token auth guardado exitosamente")
+                    except Exception:
+                        pass
+
+                self.send_response(resp.status)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Headers", "*")
+                self.send_header("Access-Control-Allow-Methods", "*")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+        except urllib.error.HTTPError as e:
+            err_data = e.read()
+            self.send_response(e.code)
+            self.send_header("Content-Type", e.headers.get("Content-Type", "application/json"))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(err_data)))
+            self.end_headers()
+            self.wfile.write(err_data)
+        except Exception as e:
+            self._send_json(502, {"status": "error", "message": f"Beszel no alcanzable (192.168.1.20:8090): {e}"})
+
     # ---------- GET ----------
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -357,6 +488,14 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
 
         if url_path == "/agent-hub":
             self._servir_archivo_ui("agent_hub.html")
+            return
+
+        if url_path == "/beszel" or url_path.startswith("/beszel/"):
+            self._proxy_beszel(parsed, method="GET")
+            return
+
+        if url_path.startswith(("/api/collections/", "/api/beszel/", "/api/batch", "/api/settings", "/api/files/")):
+            self._proxy_beszel(parsed, method="GET")
             return
 
         # Rutas de API o cliente remoto: verificar acceso antes de responder
@@ -510,11 +649,6 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             self._rechazar_origen()
             return
 
-        if url_path.startswith("/api/") or not self._cliente_local():
-            if not self._acceso_ok(urllib.parse.urlparse(self.path), url_path):
-                self._rechazar_origen()
-                return
-
         content_length = int(self.headers.get("Content-Length", 0) or 0)
         # v0.12.1: tope de cuerpo — antes se leía sin límite
         if content_length > MAX_CUERPO_BYTES:
@@ -527,6 +661,16 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             return
         post_data = self.rfile.read(content_length)
 
+        # Rutas de Beszel (proxy transparente sin requerir token del asistente)
+        if url_path.startswith("/beszel/") or url_path.startswith(("/api/collections/", "/api/beszel/", "/api/batch", "/api/settings", "/api/files/")):
+            self._proxy_beszel(urllib.parse.urlparse(self.path), method="POST", post_data=post_data)
+            return
+
+        if url_path.startswith("/api/") or not self._cliente_local():
+            if not self._acceso_ok(urllib.parse.urlparse(self.path), url_path):
+                self._rechazar_origen()
+                return
+
         try:
             payload = json.loads(post_data.decode("utf-8")) if post_data else {}
         except Exception:
@@ -534,6 +678,46 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
 
         if url_path.startswith("/api/pet/") or url_path == "/api/control":
             self._proxy_post_a_yfg(url_path, payload)
+            return
+
+        if url_path == "/api/agents/approve":
+            try:
+                sig_file = os.path.join(
+                    r"C:\Users\Guill\Documents\antigravity\blissful-einstein",
+                    ".agents", "plans", "approval_signal.json"
+                )
+                os.makedirs(os.path.dirname(sig_file), exist_ok=True)
+                with open(sig_file, "w", encoding="utf-8") as f:
+                    json.dump({"approved": True, "ts": time.time(), "source": "phone"}, f, indent=2)
+
+                # Notificar a PhoneBox de la confirmación
+                try:
+                    p_data = json.dumps({
+                        "title": "✅ Plan Aprobado",
+                        "message": "Aprobación enviada desde el teléfono. Ejecutando...",
+                        "vibrate": True,
+                    }).encode("utf-8")
+                    req = urllib.request.Request(
+                        "http://127.0.0.1:8765/api/notify",
+                        data=p_data,
+                        headers={"Content-Type": "application/json"}
+                    )
+                    urllib.request.urlopen(req, timeout=2)
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.error("Error guardando aprobación: %s", e)
+
+            self._send_json(200, {"status": "ok", "message": "Plan aprobado"})
+            return
+
+        if url_path == "/api/phone/wake":
+            try:
+                import power_guard
+                power_guard.wake_phone(seconds=35, switch_home=True)
+            except Exception as e:
+                logger.error("Error en wake: %s", e)
+            self._send_json(200, {"status": "ok", "message": "Teléfono activado"})
             return
 
         if url_path == "/api/chat":
@@ -773,6 +957,10 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
             self._send_json(200, memoria.eliminar_nota(int(nota_id)))
             return
 
+        if url_path.startswith("/beszel/") or url_path.startswith("/api/collections/") or url_path.startswith("/api/beszel/"):
+            self._proxy_beszel(parsed, method="DELETE")
+            return
+
         self._send_json(404, {"status": "error", "message": "Ruta no encontrada"})
 
     # ---------- Estado del sistema (v0.12) ----------
@@ -804,9 +992,27 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
         self.send_response(204)
         origin = self.headers.get("Origin", "*")
         self.send_header("Access-Control-Allow-Origin", origin)
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE")
         self.end_headers()
+
+    def do_PUT(self):
+        url_path = urllib.parse.urlparse(self.path).path
+        if url_path.startswith("/beszel/") or url_path.startswith("/api/collections/") or url_path.startswith("/api/beszel/"):
+            content_length = int(self.headers.get("Content-Length", 0) or 0)
+            post_data = self.rfile.read(content_length) if content_length > 0 else None
+            self._proxy_beszel(urllib.parse.urlparse(self.path), method="PUT", post_data=post_data)
+            return
+        self.send_error(405)
+
+    def do_PATCH(self):
+        url_path = urllib.parse.urlparse(self.path).path
+        if url_path.startswith("/beszel/") or url_path.startswith("/api/collections/") or url_path.startswith("/api/beszel/"):
+            content_length = int(self.headers.get("Content-Length", 0) or 0)
+            post_data = self.rfile.read(content_length) if content_length > 0 else None
+            self._proxy_beszel(urllib.parse.urlparse(self.path), method="PATCH", post_data=post_data)
+            return
+        self.send_error(405)
 
     def _send_json(self, code: int, data: Any):
         self.send_response(code)
@@ -835,6 +1041,12 @@ def start_server():
     print("• Voz neuronal edge-tts: " + (
         "activa" if tts.listar_perfiles() else "no disponible (pip install edge-tts)"
     ), flush=True)
+    try:
+        import power_guard
+        power_guard.start_guard()
+        print("• PowerGuard: Monitor de inactividad y pulso inteligente ACTIVO", flush=True)
+    except Exception as e:
+        print(f"• PowerGuard: Error iniciando ({e})", flush=True)
     print("=" * 65 + "\n", flush=True)
 
     # v0.12.1: modo red opcional para el widget del celular (con token)

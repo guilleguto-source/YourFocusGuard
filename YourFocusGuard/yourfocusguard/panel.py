@@ -69,10 +69,20 @@ def pet_listar_disponibles() -> list[dict[str, str]]:
     return resultado
 
 
-def pet_estado_actual() -> dict:
-
+def pet_estado_actual(cfg: Config | None = None) -> dict:
     with _PET_LOCK:
-        return dict(_PET_STATE)
+        d = dict(_PET_STATE)
+    if cfg is not None:
+        try:
+            st = _leer_state(cfg)
+            ses = (st or {}).get("sesion") or {}
+            d["sesion"] = ses
+            d["sesion_activa"] = bool(ses.get("activa"))
+            d["sesion_tarea"] = str((st or {}).get("tarea") or ses.get("texto") or "")
+            d["motor_estado"] = str((st or {}).get("estado") or "")
+        except Exception:
+            pass
+    return d
 
 
 def pet_fijar_reaccion(reaccion: str) -> None:
@@ -637,7 +647,7 @@ class PanelServidor:
                                 pass
                     self.send_error(404)
                 elif ruta_limpia == "/api/pet/state":
-                    self._responder(200, pet_estado_actual())
+                    self._responder(200, pet_estado_actual(panel.cfg))
                 elif ruta_limpia == "/api/pet/list":
                     self._responder(200, {"ok": True, "pets": pet_listar_disponibles()})
 

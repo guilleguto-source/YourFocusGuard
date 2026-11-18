@@ -1,71 +1,79 @@
-/* Estilos para el Widget de la Mascota Móvil (v0.12.1) */
-
-/* Barra de pestañas para alternar vistas con 1 toque */
-.nav-pestañas {
-  display: flex;
-  gap: 8px;
-  background: var(--tarjeta);
-  border: 1px solid var(--tarjeta-borde);
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 12px;
+/* Widget de Mascota Einstein Grande con Spritesheet OpenPets (v0.14.0) */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-.pestaña {
-  flex: 1;
-  text-align: center;
-  padding: 8px 12px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--texto-suave);
-  text-decoration: none;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #171d31;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #e8ecf7;
 }
 
-.pestaña.activa {
-  background: var(--acento);
-  color: #ffffff;
-}
-
-/* Contenedor principal de la mascota */
 .cuerpo-mascota {
   display: flex;
-  flex-direction: column;
-  height: 100vh;
+  align-items: center;
+  justify-content: center;
+  background: #171d31;
 }
 
-.main-mascota {
+/* Layout Horizontal en dos bloques */
+.layout-horizontal {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 6px 10px;
+  box-sizing: border-box;
+  gap: 6px;
+  background: #171d31;
+}
+
+/* ---------------- Zona Mascota (Izquierda/Centro) ---------------- */
+.zona-mascota {
   flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 0 20px;
+  justify-content: center;
+  min-width: 0;
+  position: relative;
 }
 
-/* Burbuja de diálogo contextual */
+/* Burbuja Superior Compacta */
 .burbuja-mascota {
-  width: 92%;
-  max-width: 400px;
-  background: #ffffff;
-  color: #2f2b25;
-  border-radius: 16px;
-  padding: 12px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   position: relative;
-  margin-bottom: 15px;
+  width: 95%;
+  max-width: 250px;
+  background: #ffffff;
+  color: #1e293b;
+  border-radius: 10px;
+  padding: 4px 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   text-align: center;
-  animation: burbuja-in 0.25s ease-out;
+  font-size: 0.76rem;
+  line-height: 1.22;
+  font-weight: 500;
+  z-index: 10;
+  transition: all 0.2s ease;
+  margin-bottom: 2px;
 }
 
 .burbuja-mascota::after {
   content: "";
   position: absolute;
-  bottom: -8px;
+  bottom: -5px;
   left: 50%;
   transform: translateX(-50%);
-  border-width: 8px 8px 0;
+  border-width: 5px 5px 0;
   border-style: solid;
   border-color: #ffffff transparent;
   display: block;
@@ -73,161 +81,410 @@
 }
 
 .burbuja-texto {
-  font-size: 0.95rem;
-  line-height: 1.35;
-  font-weight: 500;
-  margin-bottom: 8px;
+  word-break: break-word;
 }
 
 .burbuja-opciones {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   justify-content: center;
+  margin-top: 3px;
   flex-wrap: wrap;
 }
 
 .burbuja-btn {
-  background: #f0ede6;
-  color: #2f2b25;
-  border: 1px solid #d8d2c4;
-  border-radius: 8px;
-  padding: 7px 12px;
-  font-size: 0.82rem;
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
-  touch-action: manipulation;
-  transition: all 0.15s ease;
+  transition: background 0.15s;
 }
 
-.burbuja-btn:active {
-  background: #e2ded5;
-  transform: scale(0.96);
+.burbuja-btn:hover {
+  background: #e2e8f0;
 }
 
-/* Marco del Avatar con 50% de movimiento */
-.avatar-marco {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 200px;
-  max-height: 380px;
-}
-
-.avatar-sprite {
-  width: 180px;
+/* ---------------- Contenedor del Sprite de Einstein (Escala 80%) ---------------- */
+.pet-shell {
+  position: relative;
+  width: 192px;
   height: 180px;
+  cursor: pointer;
+  touch-action: manipulation;
+  /* Bobbing continuo desactivado para ahorro de GPU/batería */
   display: flex;
   align-items: center;
   justify-content: center;
+  transform: scale(0.80);
+  transform-origin: center center;
+  margin: -6px 0;
+}
+
+@keyframes pet-bobbing {
+  0%, 100% {
+    transform: scale(0.80) translateY(0);
+  }
+  50% {
+    transform: scale(0.80) translateY(-4px);
+  }
+}
+
+.pet-shell:active {
+  transform: scale(0.76);
+}
+
+.installed-card {
+  position: relative;
+  width: 192px;
+  height: 208px;
   overflow: hidden;
 }
 
-.avatar-sprite img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+.installed-sprite {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 192px;
+  height: 208px;
+  background-image: url("pets/einstein/spritesheet.webp");
+  background-size: 1536px 1872px;
+  background-repeat: no-repeat;
+  background-position: var(--sprite-offset-x, 0px) var(--sprite-row-y, 0px);
+  animation: var(--sprite-animation, pet-frames 4500ms steps(var(--sprite-frames, 6)) infinite);
   image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 
-/* Animación con el 50% de movimiento del original (4px suave, 2.6s) */
-.pet-bobbing-50 {
-  animation: pet-suave 2.6s ease-in-out infinite;
-}
-
-@keyframes pet-suave {
-  0%, 100% {
-    transform: translateY(0);
+@keyframes pet-frames {
+  from {
+    background-position: var(--sprite-offset-x) var(--sprite-row-y);
   }
-  50% {
-    transform: translateY(-5px);
+  to {
+    background-position: var(--sprite-end-offset-x) var(--sprite-row-y);
   }
 }
 
-/* Botonera de acciones grandes para el celular */
-.fila-botones-mascota {
+/* ---------------- Estados OpenPets (Filas y Fotogramas) ---------------- */
+/* Fila 0: Idle (6 frames, 192x208) */
+html[data-reaction-state="idle"] .installed-sprite {
+  --sprite-row-y: 0px;
+  --sprite-offset-x: 0px;
+  --sprite-end-offset-x: -1152px;
+  --sprite-frames: 6;
+  --sprite-duration: 4500ms;
+  --sprite-animation: pet-frames var(--sprite-duration) steps(6) infinite;
+}
+
+/* Fila 8: Working / Foco (6 frames) */
+html[data-reaction-state="working"] .installed-sprite,
+html[data-reaction-state="foco"] .installed-sprite {
+  --sprite-row-y: -1664px;
+  --sprite-offset-x: 0px;
+  --sprite-end-offset-x: -1152px;
+  --sprite-frames: 6;
+  --sprite-duration: 1000ms;
+  --sprite-animation: pet-frames var(--sprite-duration) steps(6) infinite;
+}
+
+/* Fila 6: Thinking / Waiting (6 frames) */
+html[data-reaction-state="thinking"] .installed-sprite,
+html[data-reaction-state="waiting"] .installed-sprite {
+  --sprite-row-y: -1248px;
+  --sprite-offset-x: 0px;
+  --sprite-end-offset-x: -1152px;
+  --sprite-frames: 6;
+  --sprite-duration: 1050ms;
+  --sprite-animation: pet-frames var(--sprite-duration) steps(6) infinite;
+}
+
+/* Fila 5: Alert / Error (8 frames) */
+html[data-reaction-state="alert"] .installed-sprite,
+html[data-reaction-state="error"] .installed-sprite {
+  --sprite-row-y: -1040px;
+  --sprite-offset-x: 0px;
+  --sprite-end-offset-x: -1536px;
+  --sprite-frames: 8;
+  --sprite-duration: 1100ms;
+  --sprite-animation: pet-frames var(--sprite-duration) steps(8) 3;
+}
+
+/* Fila 3: Waving / Saludo (4 frames) */
+html[data-reaction-state="waving"] .installed-sprite,
+html[data-reaction-state="speaking"] .installed-sprite {
+  --sprite-row-y: -624px;
+  --sprite-offset-x: 0px;
+  --sprite-end-offset-x: -768px;
+  --sprite-frames: 4;
+  --sprite-duration: 800ms;
+  --sprite-animation: pet-frames var(--sprite-duration) steps(4) infinite;
+}
+
+/* Fila 4: Jumping / Festejo (5 frames) */
+html[data-reaction-state="jumping"] .installed-sprite,
+html[data-reaction-state="celebrating"] .installed-sprite {
+  --sprite-row-y: -832px;
+  --sprite-offset-x: 0px;
+  --sprite-end-offset-x: -960px;
+  --sprite-frames: 5;
+  --sprite-duration: 850ms;
+  --sprite-animation: pet-frames var(--sprite-duration) steps(5) infinite;
+}
+
+/* ---------------- Columna Vertical Lateral Derecha ---------------- */
+.columna-botones-mascota {
   display: flex;
-  gap: 14px;
-  width: 90%;
-  max-width: 380px;
+  flex-direction: column;
+  gap: 8px;
   justify-content: center;
   align-items: center;
-  margin-top: auto;
+  width: 54px;
+  flex-shrink: 0;
+  z-index: 10;
 }
 
 .btn-pet {
-  height: 58px;
-  border-radius: 14px;
-  border: 1px solid var(--tarjeta-borde);
+  width: 52px;
+  height: 36px;
+  padding: 2px 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 1px;
   cursor: pointer;
   touch-action: manipulation;
   transition: all 0.15s ease;
   font-family: inherit;
-}
-
-.btn-pet:active {
-  transform: scale(0.95);
-}
-
-.btn-pet-icon {
-  font-size: 1.3rem;
-}
-
-.btn-pet-txt {
-  font-size: 0.92rem;
+  font-size: 0.68rem;
   font-weight: 700;
 }
 
-/* Botón Pausa */
+.btn-pet:active {
+  transform: scale(0.92);
+}
+
+.btn-pet-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.btn-pet-txt {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+/* Botón Pausa / Dormitar */
 .btn-pausa {
-  flex: 1.1;
-  background: #2a201c;
+  background: rgba(255, 157, 92, 0.18);
   color: #ff9d5c;
-  border-color: #5c3b28;
+  border-color: rgba(255, 157, 92, 0.4);
 }
 
 .btn-pausa:active {
-  background: #382922;
+  background: rgba(255, 157, 92, 0.32);
 }
 
 /* Botón Micrófono */
 .btn-mic {
-  width: 58px;
-  flex: 0 0 58px;
-  background: #1e2840;
-  color: var(--acento);
-  border-color: #3b5080;
-  border-radius: 50%;
+  background: rgba(45, 212, 191, 0.22);
+  color: #2dd4bf;
+  border-color: rgba(45, 212, 191, 0.5);
 }
 
 .btn-mic:active {
-  background: #29385c;
+  background: rgba(45, 212, 191, 0.38);
 }
 
-/* Botón Seguir */
+/* Botón Seguir / Foco */
 .btn-seguir {
-  flex: 1.1;
-  background: #182c23;
-  color: #4cd494;
-  border-color: #27543f;
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.4);
 }
 
 .btn-seguir:active {
-  background: #203b2f;
+  background: rgba(56, 189, 248, 0.32);
 }
 
-@keyframes burbuja-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+/* ---------------- Toast Notificaciones ---------------- */
+.toast {
+  position: fixed;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(15, 23, 42, 0.95);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s ease;
+  z-index: 100;
+  white-space: nowrap;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------------- Contenedor de Sesión y Perfiles ---------------- */
+.contenedor-sesion {
+  margin: 2px 0;
+  width: 95%;
+  max-width: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 20;
+}
+
+.oculta {
+  display: none !important;
+}
+
+.sesion-inactiva {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.btn-iniciar-trabajo {
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.25), rgba(56, 189, 248, 0.25));
+  border: 1px solid rgba(45, 212, 191, 0.5);
+  color: #2dd4bf;
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.btn-iniciar-trabajo:active {
+  transform: scale(0.95);
+  background: rgba(45, 212, 191, 0.4);
+}
+
+.selector-perfiles {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.btn-perfil {
+  flex: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.70rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-perfil:active {
+  transform: scale(0.94);
+}
+
+/* Perfil Fotos: púrpura / magenta sutil */
+.btn-fotos {
+  background: rgba(192, 132, 252, 0.22);
+  color: #d8b4fe;
+  border-color: rgba(192, 132, 252, 0.45);
+}
+.btn-fotos:active {
+  background: rgba(192, 132, 252, 0.4);
+}
+
+/* Perfil Vibe Coding: cian / esmeralda sutil */
+.btn-coding {
+  background: rgba(56, 189, 248, 0.22);
+  color: #7dd3fc;
+  border-color: rgba(56, 189, 248, 0.45);
+}
+.btn-coding:active {
+  background: rgba(56, 189, 248, 0.4);
+}
+
+/* Modo Sesión Activa */
+.sesion-activa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+
+.indicador-sesion {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.punto-foco {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+  animation: pulso-foco 2s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulso-foco {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.btn-cerrar-sesion {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.btn-cerrar-sesion:active {
+  background: rgba(239, 68, 68, 0.4);
+  transform: scale(0.92);
 }
