@@ -119,7 +119,6 @@
     .dot.working {
       background: #2dd4bf;
       box-shadow: 0 0 8px #2dd4bf;
-      animation: pulse 1.8s infinite;
     }
     .dot.idle { background: #64748b; }
     .dot.deepseek { background: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
@@ -223,17 +222,69 @@
     .action-box.idle { border-color: #64748b; }
     .action-text { font-size: 11px; color: #cbd5e1; }
 
-    .plan-alert {
-      background: rgba(245, 158, 11, 0.15);
+    .plan-card {
+      background: rgba(245, 158, 11, 0.12);
       border: 1px solid rgba(245, 158, 11, 0.4);
-      color: #fbbf24;
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 11px;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .plan-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fbbf24;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .plan-summary-text {
+      font-size: 11px;
+      line-height: 1.4;
+      color: #f8fafc;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .plan-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .btn-approve {
+      flex: 2;
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      transition: background 0.2s;
+    }
+    .btn-approve.approved {
+      background: #059669;
+      cursor: default;
+    }
+    .btn-review {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -288,8 +339,21 @@
         <div class="action-text" id="inspActionDetail">En ejecución</div>
       </div>
 
-      <div class="plan-alert" id="inspPlanAlert" style="display:none;">
-        <span>⚠️</span> Requiere confirmación de plan
+      <div class="plan-card" id="inspPlanCard" style="display:none;">
+        <div class="plan-header">
+          <span>📋</span> Plan Requiere Tu Aprobación
+        </div>
+        <div class="plan-summary-text" id="inspPlanSummary">
+          Cargando propuesta...
+        </div>
+        <div class="plan-actions">
+          <button class="btn-approve" id="btnApprovePlan" onclick="aprobarPlan()">
+            ✓ Aprobar Plan
+          </button>
+          <button class="btn-review" onclick="location.reload()">
+            Refrescar
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -297,6 +361,19 @@
   <script>
     let activeTab = 'agy';
     let globalData = null;
+
+    async function aprobarPlan() {
+      const btn = document.getElementById('btnApprovePlan');
+      btn.textContent = '✓ Aprobado · Notificando...';
+      btn.classList.add('approved');
+      try {
+        await fetch('/api/agents/approve', { method: 'POST' });
+        btn.textContent = '✓ Plan Aprobado';
+      } catch(e) {
+        btn.textContent = 'Reintentar';
+        btn.classList.remove('approved');
+      }
+    }
 
     function cambiarTab(tab) {
       activeTab = tab;
@@ -307,8 +384,7 @@
 
     async function fetchData() {
       try {
-        const host = location.hostname || '127.0.0.1';
-        const res = await fetch(`http://${host}:8770/api/agents/state`);
+        const res = await fetch('/api/agents/state');
         if (res.ok) {
           globalData = await res.json();
           render();
@@ -365,7 +441,14 @@
         document.getElementById('inspActionBox').className = `action-box ${isWorking ? '' : 'idle'}`;
         document.getElementById('inspActionDot').className = `dot ${isWorking ? 'working' : 'idle'}`;
         document.getElementById('inspUpdated').textContent = agy.active_session ? agy.active_session.updated : '';
-        document.getElementById('inspPlanAlert').style.display = (agy.live_step && agy.live_step.has_pending_plan) ? 'flex' : 'none';
+        const hasPlan = !!(agy.live_step && agy.live_step.has_pending_plan);
+        const planCard = document.getElementById('inspPlanCard');
+        if (planCard) {
+          planCard.style.display = hasPlan ? 'flex' : 'none';
+          if (hasPlan && agy.live_step.plan_summary) {
+            document.getElementById('inspPlanSummary').textContent = agy.live_step.plan_summary;
+          }
+        }
 
       } else {
         // Pestaña DeepSeek Harness
@@ -409,7 +492,9 @@
     }
 
     fetchData();
-    setInterval(fetchData, 2500);
+    setInterval(() => {
+      if (!document.hidden) fetchData();
+    }, 6000);
   </script>
 </body>
 </html>

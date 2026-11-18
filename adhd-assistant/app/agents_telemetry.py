@@ -9,6 +9,65 @@ from typing import Dict, Any, List
 ANTIGRAVITY_DIR = os.path.expanduser(r"~\.gemini\antigravity")
 DEEPSEEK_DIR = r"C:\Users\Guill\Documents\deepseek-harness"
 
+_LAST_STATE = {
+    "has_pending_plan": False,
+    "last_working_id": None,
+    "last_notif_time": 0,
+}
+
+
+def _extraer_resumen_amigable() -> str:
+    """Extrae un resumen comprensible y no técnico del plan activo."""
+    plan_path = os.path.join(
+        r"C:\Users\Guill\Documents\antigravity\blissful-einstein", ".agents", "plans", "active-plan.md"
+    )
+    if os.path.isfile(plan_path):
+        try:
+            with open(plan_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                title = ""
+                detalles = []
+                for line in lines:
+                    line_s = line.strip()
+                    if line_s.startswith("# Plan:"):
+                        title = line_s.replace("# Plan:", "").strip()
+                    elif line_s.startswith("- ") or line_s.startswith("* "):
+                        limpio = line_s.lstrip("-* ").strip()
+                        if len(limpio) > 8 and not limpio.startswith("["):
+                            detalles.append(limpio)
+                if title:
+                    det = detalles[0] if detalles else "Mejoras y cambios listos para aplicar"
+                    return f"{title}. {det}"
+        except Exception:
+            pass
+    return "Plan preparado con ajustes y optimizaciones listos para tu confirmación."
+
+
+def _notificar_phonebox(titulo: str, mensaje: str, cambiar_pantalla: str = None):
+    try:
+        import urllib.request
+        if cambiar_pantalla:
+            req_goto = urllib.request.Request(
+                f"http://127.0.0.1:8765/api/goto/{cambiar_pantalla}",
+                data=b"{}",
+                headers={"Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req_goto, timeout=2)
+
+        payload = json.dumps({
+            "title": titulo,
+            "message": mensaje,
+            "vibrate": True,
+        }).encode("utf-8")
+        req_notif = urllib.request.Request(
+            "http://127.0.0.1:8765/api/notify",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        urllib.request.urlopen(req_notif, timeout=2)
+    except Exception:
+        pass
+
 
 def _tiempo_relativo(iso_str: str) -> str:
     try:
@@ -109,6 +168,24 @@ def get_antigravity_state() -> Dict[str, Any]:
                                     break
             except Exception:
                 pass
+
+        if turno_info["has_pending_plan"]:
+            turno_info["plan_summary"] = _extraer_resumen_amigable()
+            if not _LAST_STATE["has_pending_plan"]:
+                _LAST_STATE["has_pending_plan"] = True
+                _notificar_phonebox("📋 Plan listo para aprobación", turno_info["plan_summary"], cambiar_pantalla="work")
+        else:
+            _LAST_STATE["has_pending_plan"] = False
+
+        # Detección de finalización de tarea
+        prev_id = _LAST_STATE.get("last_working_id")
+        if activa["status"] == "working":
+            _LAST_STATE["last_working_id"] = activa["id"]
+        elif activa["status"] == "idle" and prev_id == activa["id"]:
+            _LAST_STATE["last_working_id"] = None
+            if time.time() - _LAST_STATE.get("last_notif_time", 0) > 15:
+                _LAST_STATE["last_notif_time"] = time.time()
+                _notificar_phonebox("✅ Tarea finalizada", f"{activa['title']}: Turno completado.")
 
     # 3. Estado de proceso del Language Server
     ls_info = {"running": False, "pid": None, "memory_mb": 0}

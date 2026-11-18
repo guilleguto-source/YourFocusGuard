@@ -231,11 +231,11 @@ function enlazar() {
 }
 
 tickReloj();
-setInterval(tickReloj, 15000);
-setInterval(verificarEstado, 20000);
-setInterval(revisarAnuncios, 6000);
-setInterval(cargarAlarmas, 20000);
-setInterval(cargarTareas, 45000);
+setInterval(() => { if (!document.hidden) tickReloj(); }, 15000);
+setInterval(() => { if (!document.hidden) verificarEstado(); }, 30000);
+setInterval(() => { if (!document.hidden) revisarAnuncios(); }, 8000);
+setInterval(() => { if (!document.hidden) cargarAlarmas(); }, 30000);
+setInterval(() => { if (!document.hidden) cargarTareas(); }, 60000);
 
 verificarEstado();
 cargarBriefing();

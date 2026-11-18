@@ -214,8 +214,7 @@
   <script>
     async function updateHub() {
       try {
-        const host = location.hostname || '127.0.0.1';
-        const res = await fetch(`http://${host}:8770/api/agents/state`);
+        const res = await fetch('/api/agents/state');
         if (res.ok) {
           const data = await res.json();
           const agy = data.antigravity || {};
@@ -242,7 +241,9 @@
     }
 
     updateHub();
-    setInterval(updateHub, 3000);
+    setInterval(() => {
+      if (!document.hidden) updateHub();
+    }, 6000);
   </script>
 </body>
 </html>

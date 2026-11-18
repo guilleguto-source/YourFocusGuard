@@ -48,9 +48,8 @@ BESZEL_URL = os.getenv("BESZEL_URL", "http://192.168.1.20:8090")
 YFG_PORT = int(os.getenv("YFG_PUERTO", "8756"))
 YFG_URL = f"http://127.0.0.1:{YFG_PORT}"
 
-#: Puerto configurable (lo usa pruebas_automaticas.py para no chocar con
-#: tu servidor real en 8765)
-PORT = int(os.getenv("ASISTENTE_PUERTO", "8765"))
+#: Puerto configurable (8770 por defecto para convivir con PhoneBox en 8765)
+PORT = int(os.getenv("ASISTENTE_PUERTO", "8770"))
 
 #: Orígenes permitidos para la API local (la UI se sirve desde el mismo
 #: servidor). Antes respondía Access-Control-Allow-Origin: * , lo que
@@ -133,7 +132,7 @@ IP_LAN = _ip_lan()
 #: Hosts válidos para el header Host (anti DNS-rebinding)
 _HOSTS_PERMITIDOS = {
     f"{h}:{PORT}" for h in ("localhost", "127.0.0.1", IP_LAN) if h
-}
+} | {h for h in ("localhost", "127.0.0.1", IP_LAN) if h}
 
 #: Orígenes http válidos (localhost + la IP LAN para el widget del celular)
 _ORIGENES_PERMITIDOS = set(ORIGENES_PERMITIDOS)
@@ -1015,13 +1014,16 @@ class AssistantHTTPHandler(SimpleHTTPRequestHandler):
         self.send_error(405)
 
     def _send_json(self, code: int, data: Any):
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.end_headers()
-        self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.end_headers()
+            self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            pass
 
     def log_message(self, format, *args):
         pass  # Silenciar logs verbosos en consola
